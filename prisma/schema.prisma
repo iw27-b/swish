@@ -1,0 +1,64 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String // Will be hashed
+  name      String?
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailVerified Boolean? @default(false)
+  emailVerificationToken String? @unique
+  emailVerificationTokenExpiry DateTime?
+
+  // Optional fields for future features
+  twoFactorEnabled    Boolean? @default(false)
+  // twoFactorSecret String? // For storing the 2FA secret, if we implement TOTP
+  // Passkey related fields would go here
+  // OAuth related fields (e.g., googleId, githubId) would go here
+
+  // Seller specific fields
+  isSeller            Boolean? @default(false)
+  sellerVerificationStatus String? // e.g., PENDING, VERIFIED, REJECTED
+
+  // User interactions
+  // ratingsGiven Review[] @relation("RatingsGiven")
+  // ratingsReceived Review[] @relation("RatingsReceived")
+
+  // Preferences
+  languagePreference String? @default("en")
+  // notificationPreferences Json? // For complex notification settings
+}
+
+enum Role {
+  USER
+  SELLER
+  ADMIN
+}
+
+// Example for a Review model if we were to implement it now
+// model Review {
+//   id          String   @id @default(cuid())
+//   rating      Int
+//   comment     String?
+//   reviewer    User     @relation("RatingsGiven", fields: [reviewerId], references: [id])
+//   reviewerId  String
+//   reviewee    User     @relation("RatingsReceived", fields: [revieweeId], references: [id])
+//   revieweeId  String
+//   createdAt   DateTime @default(now())
+// } 
