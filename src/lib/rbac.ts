@@ -42,7 +42,7 @@ export function hasPermission(
     role: Role,
     resource: string,
     action: string,
-    req: NextRequest, // req might not always be needed but good for conditional logic
+    req: NextRequest,
     user: JwtPayload
 ): boolean {
     const permissions = rolePermissions[role];

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-// Define PurchaseStatus enum locally until Prisma generates it
 enum PurchaseStatus {
     PENDING = 'PENDING',
     PAID = 'PAID',
@@ -11,7 +10,6 @@ enum PurchaseStatus {
     REFUNDED = 'REFUNDED'
 }
 
-// Address schema for shipping addresses
 export const AddressSchema = z.object({
     street: z.string().min(1, { message: 'Street address is required' }).max(200),
     city: z.string().min(1, { message: 'City is required' }).max(100),
@@ -19,25 +17,23 @@ export const AddressSchema = z.object({
     postalCode: z.string().min(1, { message: 'Postal code is required' }).max(20),
     country: z.string().min(1, { message: 'Country is required' }).max(100),
     isDefault: z.boolean().default(false),
-    label: z.string().max(50).optional(), // e.g., "Home", "Work"
+    label: z.string().max(50).optional(),
 });
 
 export type Address = z.infer<typeof AddressSchema>;
 
-// Payment method schema
 export const PaymentMethodSchema = z.object({
     type: z.enum(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER']),
-    label: z.string().max(50), // e.g., "Visa ending in 1234"
+    label: z.string().max(50),
     isDefault: z.boolean().default(false),
-    lastFour: z.string().length(4).optional(), // Last 4 digits for cards
+    lastFour: z.string().length(4).optional(),
     expiryMonth: z.number().min(1).max(12).optional(),
     expiryYear: z.number().min(2024).max(2050).optional(),
-    provider: z.string().max(50).optional(), // e.g., "Visa", "PayPal"
+    provider: z.string().max(50).optional(),
 });
 
 export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
 
-// Extended user profile update schema
 export const UpdateExtendedUserSchema = z.object({
     name: z.string()
         .min(1, { message: 'Name is required' })
@@ -63,7 +59,6 @@ export const UpdateExtendedUserSchema = z.object({
 
 export type UpdateExtendedUserRequestBody = z.infer<typeof UpdateExtendedUserSchema>;
 
-// Security PIN schema
 export const SetSecurityPinSchema = z.object({
     pin: z.string()
         .length(6, { message: 'PIN must be exactly 6 digits' })
@@ -76,7 +71,6 @@ export const SetSecurityPinSchema = z.object({
 
 export type SetSecurityPinRequestBody = z.infer<typeof SetSecurityPinSchema>;
 
-// Collection schemas
 export const CreateCollectionSchema = z.object({
     name: z.string().min(1, { message: 'Collection name is required' }).max(100),
     description: z.string().max(500).optional(),
@@ -109,14 +103,12 @@ export const ShareCollectionSchema = z.object({
 
 export type ShareCollectionRequestBody = z.infer<typeof ShareCollectionSchema>;
 
-// Follow schemas
 export const FollowUserSchema = z.object({
     userId: z.string().cuid({ message: 'Invalid user ID' }),
 });
 
 export type FollowUserRequestBody = z.infer<typeof FollowUserSchema>;
 
-// Card tracking schemas
 export const TrackCardSchema = z.object({
     cardId: z.string().cuid({ message: 'Invalid card ID' }),
     targetPrice: z.number().positive().optional(),
@@ -134,7 +126,6 @@ export const UpdateCardTrackingSchema = z.object({
 
 export type UpdateCardTrackingRequestBody = z.infer<typeof UpdateCardTrackingSchema>;
 
-// Purchase history schemas
 export const PurchaseQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     pageSize: z.coerce.number().min(1).max(50).default(10),
@@ -147,7 +138,6 @@ export const PurchaseQuerySchema = z.object({
 
 export type PurchaseQuery = z.infer<typeof PurchaseQuerySchema>;
 
-// Payment method management schemas
 export const AddPaymentMethodSchema = z.object({
     type: z.enum(['CREDIT_CARD', 'DEBIT_CARD', 'PAYPAL', 'BANK_TRANSFER']),
     label: z.string().min(1).max(50),
@@ -169,7 +159,6 @@ export const UpdatePaymentMethodSchema = z.object({
 
 export type UpdatePaymentMethodRequestBody = z.infer<typeof UpdatePaymentMethodSchema>;
 
-// Query schemas for lists
 export const CollectionQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     pageSize: z.coerce.number().min(1).max(50).default(10),

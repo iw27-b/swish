@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { CardCondition, CardRarity, Role } from '@prisma/client';
 
-// Search query schema with filters
 export const SearchQuerySchema = z.object({
     // Core search parameters
     query: z.string().min(1, { message: 'Search query is required' }).max(200),

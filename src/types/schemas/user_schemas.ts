@@ -86,7 +86,7 @@ export const UserResponseSchema = z.object({
     bio: z.string().nullable(),
     shippingAddress: z.any().nullable(), // JSON field
     paymentMethods: z.array(z.any()).nullable(), // JSON array
-    hasSecurityPin: z.boolean().optional(), // Don't expose the actual PIN
+    hasSecurityPin: z.boolean().optional(),
 });
 
 export type UserResponse = z.infer<typeof UserResponseSchema>; 
