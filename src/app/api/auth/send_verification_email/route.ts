@@ -15,6 +15,12 @@ async function sendVerificationEmail(email: string, token: string) {
     return Promise.resolve();
 }
 
+/**
+ * This route is used to send a verification email to the user.
+ * @param req AuthenticatedRequest - The user object that is authenticated
+ * @returns JSON response with success or error message
+ */
+
 export async function POST(req: AuthenticatedRequest) {
     if (!req.user) {
         return NextResponse.json({ message: 'Authentication required' }, { status: 401 });

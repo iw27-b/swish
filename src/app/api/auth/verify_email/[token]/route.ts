@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+/**
+ * This route is used to verify the email of the user.
+ * @param req NextRequest - The request object
+ * @param params - The token to verify the email
+ * @returns JSON response with success or error message
+ */
+
 export async function GET(
     req: NextRequest,
     { params }: { params: { token: string } }

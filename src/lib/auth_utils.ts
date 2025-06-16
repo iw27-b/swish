@@ -3,11 +3,13 @@ import { Role } from '@prisma/client';
 import { JwtPayload } from '@/types';
 
 const JWT_SECRET: string = process.env.JWT_SECRET!;
-// const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN; // Keep commented out for now
-
 if (!JWT_SECRET) {
     throw new Error('JWT_SECRET is not defined in environment variables. Please add it to your .env file.');
 }
+
+const loginAttempts = new Map<string, { count: number; resetTime: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
 
 /**
  * Generates a JWT for a given user.
@@ -17,12 +19,7 @@ if (!JWT_SECRET) {
  */
 export function generateToken(userId: string, role: Role): string {
     const payload: Pick<JwtPayload, 'userId' | 'role'> = { userId, role };
-    // const options: jwt.SignOptions = {};
-    // if (JWT_EXPIRES_IN) {
-    //   options.expiresIn = JWT_EXPIRES_IN; 
-    // }
-    // return jwt.sign(payload, JWT_SECRET, options);
-    return jwt.sign(payload, JWT_SECRET); // Simplified call without options
+    return jwt.sign(payload, JWT_SECRET);
 }
 
 /**
@@ -35,7 +32,60 @@ export function verifyToken(token: string): JwtPayload | null {
         const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
         return decoded;
     } catch (error) {
-        // console.error('Invalid token:', (error as Error).message);
         return null;
     }
+}
+
+/**
+ * Checks if an IP address is rate limited for login attempts.
+ * @param ipAddress The IP address to check.
+ * @returns true if rate limited, false otherwise.
+ */
+export function isRateLimited(ipAddress: string): boolean {
+    const now = Date.now();
+    const attempts = loginAttempts.get(ipAddress);
+
+    if (!attempts) {
+        return false;
+    }
+
+    if (now > attempts.resetTime) {
+        loginAttempts.delete(ipAddress);
+        return false;
+    }
+
+    return attempts.count >= MAX_LOGIN_ATTEMPTS;
+}
+
+/**
+ * Records a failed login attempt for rate limiting.
+ * @param ipAddress The IP address of the failed attempt.
+ */
+export function recordFailedAttempt(ipAddress: string): void {
+    const now = Date.now();
+    const attempts = loginAttempts.get(ipAddress);
+
+    if (!attempts) {
+        loginAttempts.set(ipAddress, { count: 1, resetTime: now + LOCKOUT_TIME });
+    } else {
+        attempts.count += 1;
+        attempts.resetTime = now + LOCKOUT_TIME;
+    }
+}
+
+/**
+ * Clears failed login attempts for an IP address (on successful login).
+ * @param ipAddress The IP address to clear attempts for.
+ */
+export function clearFailedAttempts(ipAddress: string): void {
+    loginAttempts.delete(ipAddress);
+}
+
+/**
+ * Sanitizes email input by trimming and converting to lowercase.
+ * @param email The email to sanitize.
+ * @returns The sanitized email.
+ */
+export function sanitizeEmail(email: string): string {
+    return email.trim().toLowerCase();
 } 

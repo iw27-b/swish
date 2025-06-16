@@ -1,35 +1,53 @@
 import { Role } from '@prisma/client';
 import { z } from 'zod';
 
+const passwordSchema = z.string()
+    .min(12, { message: 'Password must be at least 12 characters long' })
+    .max(128, { message: 'Password must be less than 128 characters' })
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
+    });
+
+const emailSchema = z.string()
+    .email({ message: 'Invalid email address' })
+    .min(5, { message: 'Email must be at least 5 characters long' })
+    .max(254, { message: 'Email must be less than 254 characters' })
+    .refine((email) => {
+        return !email.includes('..') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }, { message: 'Invalid email format' });
+
 export const RegisterSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
-  name: z.string().optional(),
+    email: emailSchema,
+    password: passwordSchema,
+    name: z.string()
+        .min(1, { message: 'Name is required' })
+        .max(100, { message: 'Name must be less than 100 characters' })
+        .regex(/^[a-zA-Z\s'-]+$/, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' }),
 });
 
 export type RegisterRequestBody = z.infer<typeof RegisterSchema>;
 
 export const LoginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  password: z.string(),
+    email: emailSchema,
+    password: z.string().min(1, { message: 'Password is required' }),
 });
 
 export type LoginRequestBody = z.infer<typeof LoginSchema>;
 
 export const UserResponseSchema = z.object({
-  id: z.string(),
-  email: z.string().email(),
-  name: z.string().nullable(),
-  role: z.nativeEnum(Role),
+    id: z.string(),
+    email: z.string().email(),
+    name: z.string().nullable(),
+    role: z.nativeEnum(Role),
 });
 
 export const RegisterResponseSchema = z.object({
-  message: z.string(),
-  user: UserResponseSchema,
+    message: z.string(),
+    user: UserResponseSchema,
 });
 
 export const LoginResponseSchema = z.object({
-  message: z.string(),
-  token: z.string(),
-  user: UserResponseSchema,
+    message: z.string(),
+    token: z.string(),
+    user: UserResponseSchema,
 }); 

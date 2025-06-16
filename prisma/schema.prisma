@@ -29,8 +29,6 @@ model User {
   // Optional fields for future features
   twoFactorEnabled    Boolean? @default(false)
   // twoFactorSecret String? // For storing the 2FA secret, if we implement TOTP
-  // Passkey related fields would go here
-  // OAuth related fields (e.g., googleId, githubId) would go here
 
   // Seller specific fields
   isSeller            Boolean? @default(false)
@@ -43,6 +41,9 @@ model User {
   // Preferences
   languagePreference String? @default("en")
   // notificationPreferences Json? // For complex notification settings
+
+  resetToken String?
+  resetTokenExpiry DateTime?
 }
 
 enum Role {
@@ -51,7 +52,6 @@ enum Role {
   ADMIN
 }
 
-// Example for a Review model if we were to implement it now
 // model Review {
 //   id          String   @id @default(cuid())
 //   rating      Int
