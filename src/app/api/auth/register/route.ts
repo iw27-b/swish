@@ -25,14 +25,27 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Too many registration attempts. Please try again later.', 429);
         }
 
-        // Check Content-Length header before parsing to prevent resource exhaustion
         const contentLength = req.headers.get('content-length');
         if (contentLength && parseInt(contentLength, 10) > 100000) {
             recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);
         }
 
-        const requestBody = await req.json();
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            recordFailedAttempt(clientIP);
+            logAuditEvent({
+                action: 'REGISTRATION_INVALID_JSON',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'auth',
+                timestamp: new Date(),
+                details: { error: 'Invalid JSON format' },
+            });
+            return createErrorResponse('Invalid JSON format in request body', 400);
+        }
 
         const validationResult = RegisterSchema.safeParse(requestBody);
 

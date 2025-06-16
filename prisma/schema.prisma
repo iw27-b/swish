@@ -45,8 +45,31 @@ model User {
   resetToken String? @unique
   resetTokenExpiry DateTime?
 
+  // Extended user profile fields
+  shippingAddress Json? // Flexible JSON for address data
+  paymentMethods Json[] // Array of payment method objects
+  securityPin String? // Hashed PIN for additional security
+  phoneNumber String?
+  dateOfBirth DateTime?
+  profileImageUrl String?
+  bio String?
+
   // Card relations
   cards Card[]
+  collections Collection[]
+  sharedCollections CollectionShare[]
+  
+  // Social features
+  following UserFollow[] @relation("Follower")
+  followers UserFollow[] @relation("Following")
+  
+  // Favorites and tracking
+  favoriteCards CardFavorite[]
+  trackedListings CardTracking[]
+  
+  // Purchase history
+  purchases Purchase[]
+  sales Purchase[] @relation("Seller")
 
 }
 
@@ -86,6 +109,12 @@ model Card {
   owner       User          @relation(fields: [ownerId], references: [id])
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  
+  // New relations
+  collections CollectionCard[]
+  favorites   CardFavorite[]
+  tracking    CardTracking[]
+  purchases   Purchase[]
 }
 
 enum CardCondition {
@@ -104,4 +133,126 @@ enum CardRarity {
   RARE
   ULTRA_RARE
   LEGENDARY
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  isPublic    Boolean  @default(false)
+  isShared    Boolean  @default(false)
+  imageUrl    String?
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cards       CollectionCard[]
+  sharedWith  CollectionShare[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model CollectionCard {
+  id           String     @id @default(cuid())
+  collectionId String
+  cardId       String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  card         Card       @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  addedAt      DateTime   @default(now())
+  notes        String?
+
+  @@unique([collectionId, cardId])
+  @@index([collectionId])
+  @@index([cardId])
+}
+
+model CollectionShare {
+  id           String     @id @default(cuid())
+  collectionId String
+  userId       String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  canEdit      Boolean    @default(false)
+  sharedAt     DateTime   @default(now())
+
+  @@unique([collectionId, userId])
+  @@index([collectionId])
+  @@index([userId])
+}
+
+model UserFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model CardFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  cardId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+}
+
+model CardTracking {
+  id              String   @id @default(cuid())
+  userId          String
+  cardId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card            Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  targetPrice     Float?   // User wants to be notified when price drops to this
+  notifyOnSale    Boolean  @default(true)
+  notifyOnPriceChange Boolean @default(true)
+  createdAt       DateTime @default(now())
+  lastNotified    DateTime?
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@index([cardId])
+}
+
+model Purchase {
+  id          String        @id @default(cuid())
+  buyerId     String
+  sellerId    String
+  cardId      String
+  buyer       User          @relation(fields: [buyerId], references: [id])
+  seller      User          @relation("Seller", fields: [sellerId], references: [id])
+  card        Card          @relation(fields: [cardId], references: [id])
+  price       Float
+  status      PurchaseStatus
+  paymentMethod String?
+  shippingAddress Json?
+  trackingNumber String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  completedAt DateTime?
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([cardId])
+  @@index([status])
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  REFUNDED
 }

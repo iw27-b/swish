@@ -26,9 +26,22 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Too many login attempts. Please try again later.', 429);
         }
 
-        const requestBody = await req.json();
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            recordFailedAttempt(clientIP);
+            logAuditEvent({
+                action: 'LOGIN_INVALID_JSON',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'auth',
+                timestamp: new Date(),
+                details: { error: 'Invalid JSON format' },
+            });
+            return createErrorResponse('Invalid JSON format in request body', 400);
+        }
 
-        // Validate request size
         if (!validateRequestSize(requestBody)) {
             recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);

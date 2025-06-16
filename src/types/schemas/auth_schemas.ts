@@ -22,7 +22,12 @@ export const RegisterSchema = z.object({
     name: z.string()
         .min(1, { message: 'Name is required' })
         .max(100, { message: 'Name must be less than 100 characters' })
-        .regex(/^[a-zA-Z\s'-]+$/, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' }),
+        .regex(/^[\p{L}\p{M}\s'-]+$/u, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' })
+        .refine((name) => {
+            // Additional validation to prevent abuse while allowing international characters
+            const trimmedName = name.trim();
+            return trimmedName.length > 0 && trimmedName.length <= 100;
+        }, { message: 'Name must contain at least one non-whitespace character' }),
 });
 
 export type RegisterRequestBody = z.infer<typeof RegisterSchema>;

@@ -5,7 +5,7 @@ export const UpdateUserSchema = z.object({
     name: z.string()
         .min(1, { message: 'Name is required' })
         .max(100, { message: 'Name must be less than 100 characters' })
-        .regex(/^[a-zA-Z\s'-]+$/, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' })
+        .regex(/^[\p{L}\p{M}\s'-]+$/u, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' })
         .optional(),
     languagePreference: z.enum(['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh'])
         .default('en')
@@ -44,7 +44,7 @@ export const ResetPasswordSchema = z.object({
     password: z.string()
         .min(12, { message: 'Password must be at least 12 characters long' })
         .max(128, { message: 'Password must be less than 128 characters' })
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, {
             message: 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
         }),
     confirmPassword: z.string().min(1, { message: 'Password confirmation is required' }),
@@ -79,6 +79,14 @@ export const UserResponseSchema = z.object({
     isSeller: z.boolean(),
     sellerVerificationStatus: z.string().nullable(),
     languagePreference: z.string(),
+    // Extended profile fields
+    phoneNumber: z.string().nullable(),
+    dateOfBirth: z.date().nullable(),
+    profileImageUrl: z.string().nullable(),
+    bio: z.string().nullable(),
+    shippingAddress: z.any().nullable(), // JSON field
+    paymentMethods: z.array(z.any()).nullable(), // JSON array
+    hasSecurityPin: z.boolean().optional(), // Don't expose the actual PIN
 });
 
 export type UserResponse = z.infer<typeof UserResponseSchema>; 
