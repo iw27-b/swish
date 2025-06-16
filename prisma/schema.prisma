@@ -42,8 +42,12 @@ model User {
   languagePreference String? @default("en")
   // notificationPreferences Json? // For complex notification settings
 
-  resetToken String?
+  resetToken String? @unique
   resetTokenExpiry DateTime?
+
+  // Card relations
+  cards Card[]
+
 }
 
 enum Role {
@@ -62,3 +66,42 @@ enum Role {
 //   revieweeId  String
 //   createdAt   DateTime @default(now())
 // } 
+
+model Card {
+  id          String        @id @default(cuid())
+  name        String
+  player      String
+  team        String
+  year        Int
+  brand       String
+  cardNumber  String
+  condition   CardCondition
+  rarity      CardRarity
+  description String?
+  imageUrl    String?
+  isForTrade  Boolean       @default(false)
+  isForSale   Boolean       @default(false)
+  price       Float?
+  ownerId     String
+  owner       User          @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+enum CardCondition {
+  POOR
+  FAIR
+  GOOD
+  VERY_GOOD
+  EXCELLENT
+  NEAR_MINT
+  MINT
+}
+
+enum CardRarity {
+  COMMON
+  UNCOMMON
+  RARE
+  ULTRA_RARE
+  LEGENDARY
+}

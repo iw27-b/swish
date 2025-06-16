@@ -45,12 +45,13 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Too many password reset attempts. Please try again later.', 429);
         }
 
-        const requestBody = await req.json();
-
-        if (!validateRequestSize(requestBody)) {
+        const contentLength = req.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > 100000) {
             recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);
         }
+
+        const requestBody = await req.json();
 
         const validationResult = ForgotPasswordSchema.safeParse(requestBody);
         if (!validationResult.success) {
@@ -92,8 +93,8 @@ export async function POST(req: NextRequest) {
         await prisma.user.update({
             where: { id: user.id },
             data: {
-                passwordResetToken: resetToken,
-                emailVerificationTokenExpiry: resetTokenExpiry,
+                resetToken: resetToken,
+                resetTokenExpiry: resetTokenExpiry,
             },
         });
 

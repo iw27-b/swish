@@ -64,7 +64,10 @@ export async function middleware(req: AuthenticatedRequest) {
             resource = 'auth';
             action = 'change:password';
         } else if (path.startsWith('/api/cards')) {
-            if (method === 'POST') {
+            if (method === 'GET') {
+                resource = 'cards';
+                action = 'read:own';
+            } else if (method === 'POST') {
                 resource = 'cards';
                 action = 'create:own';
             } else if (method === 'PATCH' || method === 'DELETE') {

@@ -19,7 +19,7 @@ export const ChangePasswordSchema = z.object({
     newPassword: z.string()
         .min(12, { message: 'New password must be at least 12 characters long' })
         .max(128, { message: 'New password must be less than 128 characters' })
-        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, {
+        .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/, {
             message: 'New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
         }),
     confirmPassword: z.string().min(1, { message: 'Password confirmation is required' }),

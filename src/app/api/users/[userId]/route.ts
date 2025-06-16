@@ -81,7 +81,7 @@ export async function GET(
 }
 
 /**
- * This route is used to update a specific user's profile. (AS ADMIN)
+ * This route is used to update a specific user's profile.
  * @param req AuthenticatedRequest - The user object that is authenticated
  * @param params - The user ID
  * @returns JSON response with success or error message

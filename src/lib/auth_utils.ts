@@ -19,7 +19,7 @@ const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutes
  */
 export function generateToken(userId: string, role: Role): string {
     const payload: Pick<JwtPayload, 'userId' | 'role'> = { userId, role };
-    return jwt.sign(payload, JWT_SECRET);
+    return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 }
 
 /**

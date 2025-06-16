@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { ResetPasswordSchema, ResetPasswordRequestBody } from '@/types/schemas/user_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
-import { hashPassword } from '@/lib/password_utils';
+import { hashPassword, verifyPassword } from '@/lib/password_utils';
 
 /**
  * This route is used to reset the password of the user.
@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
 
         const user = await prisma.user.findFirst({
             where: {
-                emailVerificationToken: token,
-                emailVerificationTokenExpiry: { gt: new Date() },
+                resetToken: token,
+                resetTokenExpiry: { gt: new Date() },
             },
             select: { id: true, email: true, password: true }
         });
@@ -74,7 +74,6 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Invalid or expired reset token', 400);
         }
 
-        const { verifyPassword } = await import('@/lib/password_utils');
         const isSamePassword = await verifyPassword(user.password, password);
         if (isSamePassword) {
             recordFailedAttempt(clientIP);
@@ -95,8 +94,8 @@ export async function POST(req: NextRequest) {
             where: { id: user.id },
             data: {
                 password: hashedPassword,
-                emailVerificationToken: null,
-                emailVerificationTokenExpiry: null,
+                resetToken: null,
+                resetTokenExpiry: null,
             },
         });
 

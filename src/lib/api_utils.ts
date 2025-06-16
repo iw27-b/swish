@@ -39,7 +39,8 @@ export function createErrorResponse(
 
 export function validateRequestSize(body: any, maxSizeBytes: number = 100000): boolean {
     const bodyString = typeof body === 'string' ? body : JSON.stringify(body);
-    return Buffer.byteLength(bodyString, 'utf8') <= maxSizeBytes;
+    const size = new TextEncoder().encode(bodyString).length;
+    return size <= maxSizeBytes;
 }
 
 export function getClientIP(headers: Headers): string {

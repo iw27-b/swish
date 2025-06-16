@@ -210,38 +210,39 @@ export async function POST(req: AuthenticatedRequest) {
 
         const cardData = validationResult.data as CreateCardRequestBody;
 
-        const card = await prisma.card?.create({
-            data: {
-                ...cardData,
-                ownerId: userId,
-            },
-            include: {
-                owner: {
-                    select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                    }
-                }
-            },
-        });
+        // TODO: Uncomment when Card model is added to Prisma schema
+        // const card = await prisma.card.create({
+        //     data: {
+        //         ...cardData,
+        //         ownerId: userId,
+        //     },
+        //     include: {
+        //         owner: {
+        //             select: {
+        //                 id: true,
+        //                 name: true,
+        //                 email: true,
+        //             }
+        //         }
+        //     },
+        // });
 
-        if (!card) {
-            return createErrorResponse('Failed to create card - Card model may not exist', 500);
-        }
+        // Temporary response until Card model exists
+        return createErrorResponse('Card creation not available - Card model not implemented yet', 501);
 
-        logAuditEvent({
-            action: 'CARD_CREATED',
-            userId: userId,
-            ip: getClientIP(req.headers),
-            userAgent: getUserAgent(req.headers),
-            resource: 'cards',
-            resourceId: card.id,
-            timestamp: new Date(),
-            details: { cardName: card.name, player: card.player },
-        });
+        // TODO: Uncomment when Card model is added to Prisma schema
+        // logAuditEvent({
+        //     action: 'CARD_CREATED',
+        //     userId: userId,
+        //     ip: getClientIP(req.headers),
+        //     userAgent: getUserAgent(req.headers),
+        //     resource: 'cards',
+        //     resourceId: card.id,
+        //     timestamp: new Date(),
+        //     details: { cardName: card.name, player: card.player },
+        // });
 
-        return createSuccessResponse(card, 'Card created successfully');
+        // return createSuccessResponse(card, 'Card created successfully');
 
     } catch (error) {
         console.error('Create card error:', error);

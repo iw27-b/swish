@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { UserListQuerySchema, UserListQuery } from '@/types/schemas/user_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo, sanitizePaginationParams } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
 
 /**

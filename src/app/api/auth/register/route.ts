@@ -25,12 +25,14 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Too many registration attempts. Please try again later.', 429);
         }
 
-        const requestBody = await req.json();
-
-        if (!validateRequestSize(requestBody)) {
+        // Check Content-Length header before parsing to prevent resource exhaustion
+        const contentLength = req.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > 100000) {
             recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);
         }
+
+        const requestBody = await req.json();
 
         const validationResult = RegisterSchema.safeParse(requestBody);
 
