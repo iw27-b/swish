@@ -139,7 +139,7 @@ export async function POST(req: AuthenticatedRequest) {
 
         const contentLength = req.headers.get('content-length');
         if (contentLength && parseInt(contentLength, 10) > 100000) {
-            recordAttemptForOperation(clientIP, 'collections');
+            recordAttemptForOperation(clientIP, 'trades');
             logAuditEvent({
                 action: 'TRADE_CREATION_REQUEST_TOO_LARGE',
                 userId: userId,

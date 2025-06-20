@@ -15,7 +15,7 @@ class SimpleCache {
      */
     get<T>(key: string): T | null {
         const item = this.cache.get(key);
-        
+
         if (!item) {
             return null;
         }
@@ -70,10 +70,19 @@ class SimpleCache {
 
 export const cache = new SimpleCache();
 
-if (typeof setInterval !== 'undefined') {
-    setInterval(() => {
-        cache.cleanup();
-    }, 10 * 60 * 1000);
+let cleanupInterval: NodeJS.Timeout | undefined;
+
+ if (typeof setInterval !== 'undefined') {
+    cleanupInterval = setInterval(() => {
+         cache.cleanup();
+     }, 10 * 60 * 1000);
+ }
+
+export function stopCacheCleanup(): void {
+    if (cleanupInterval) {
+        clearInterval(cleanupInterval);
+        cleanupInterval = undefined;
+    }
 }
 
 /**
@@ -95,7 +104,7 @@ export async function withCache<T>(
 
     const result = await fn();
     cache.set(key, result, ttlSeconds);
-    
+
     return result;
 }
 
@@ -126,12 +135,12 @@ export function createGlobalCacheKey(operation: string, params?: string): string
  */
 export function invalidateCachePattern(pattern: string): void {
     const keys = cache.getStats().keys;
-    const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\');
+    const escaped = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&');
     const regex = new RegExp(escaped.replace(/\*/g, '.*'));
-    
+
     for (const key of keys) {
         if (regex.test(key)) {
             cache.delete(key);
         }
     }
-} 
+}

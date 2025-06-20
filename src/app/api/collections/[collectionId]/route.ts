@@ -14,14 +14,14 @@ import { Role } from '@prisma/client';
  */
 export async function GET(
     req: AuthenticatedRequest,
-    { params }: { params: Promise<{ userId: string; collectionId: string }> }
+    { params }: { params: Promise<{ collectionId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId, collectionId } = await params;
+        const { collectionId } = await params;
         const requestingUser = req.user;
 
         const collection = await prisma.collection.findUnique({
@@ -115,14 +115,14 @@ export async function GET(
  */
 export async function PATCH(
     req: AuthenticatedRequest,
-    { params }: { params: Promise<{ userId: string; collectionId: string }> }
+    { params }: { params: Promise<{ collectionId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId, collectionId } = await params;
+        const { collectionId } = await params;
         const requestingUser = req.user;
 
         let requestBody;
@@ -183,11 +183,16 @@ export async function PATCH(
             }
         }
 
-        const updateData: any = {};
+        const updateData: Partial<{
+            name: string;
+            description: string | null;
+            isPublic: boolean;
+            imageUrl: string | null;
+        }> = {};
         if (name !== undefined) updateData.name = name.trim();
-        if (description !== undefined) updateData.description = description?.trim();
+        if (description !== undefined) updateData.description = description?.trim() || null;
         if (isPublic !== undefined) updateData.isPublic = isPublic;
-        if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+        if (imageUrl !== undefined) updateData.imageUrl = imageUrl || null;
 
         if (Object.keys(updateData).length === 0) {
             return createSuccessResponse(collection, 'No changes detected');

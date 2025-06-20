@@ -15,10 +15,10 @@ const MAX_FAILED_ATTEMPTS = 5;
 
 const RATE_LIMITS = {
     auth: { maxAttempts: MAX_FAILED_ATTEMPTS, duration: RATE_LIMIT_DURATION },
-    search: { maxAttempts: 100, duration: 60 * 1000 }, 
-    collections: { maxAttempts: 20, duration: 60 * 1000 }, 
-    profile_updates: { maxAttempts: 10, duration: 60 * 1000 }, 
-    purchases: { maxAttempts: 5, duration: 60 * 1000 }, 
+    search: { maxAttempts: 100, duration: 60 * 1000 },
+    collections: { maxAttempts: 20, duration: 60 * 1000 },
+    profile_updates: { maxAttempts: 10, duration: 60 * 1000 },
+    purchases: { maxAttempts: 5, duration: 60 * 1000 },
     trades: { maxAttempts: 10, duration: 60 * 1000 },
 };
 
@@ -38,7 +38,7 @@ export function generateToken(userId: string, role: string = 'USER'): string {
     };
 
     try {
-        const token = jwt.sign(payload, JWT_SECRET!, { 
+        const token = jwt.sign(payload, JWT_SECRET!, {
             expiresIn: '15m',
             algorithm: 'HS256'
         });
@@ -61,7 +61,7 @@ export function generateRefreshToken(userId: string, role: string = 'USER'): str
     };
 
     try {
-        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET!, { 
+        const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET!, {
             expiresIn: '7d',
             algorithm: 'HS256'
         });
@@ -78,7 +78,7 @@ export function generateRefreshToken(userId: string, role: string = 'USER'): str
  */
 export function verifyToken(token: string): { userId: string; role: string } | null {
     try {
-        const decoded = jwt.verify(token, JWT_SECRET!) as any;
+        const decoded = jwt.verify(token, JWT_SECRET!) as unknown as { userId: string; role: string };
         return { userId: decoded.userId, role: decoded.role };
     } catch (error) {
         return null;
@@ -104,7 +104,7 @@ export function isRateLimitedForOperation(ip: string, operation: keyof typeof RA
     const key = `${operation}:${ip}`;
     const now = Date.now();
     const limit = RATE_LIMITS[operation];
-    
+
     if (!rateLimitStore[key]) {
         return false;
     }
@@ -143,7 +143,7 @@ export function recordAttemptForOperation(ip: string, operation: keyof typeof RA
         };
     } else {
         const record = rateLimitStore[key];
-        
+
         if (now > record.resetTime) {
             record.attempts = 1;
             record.resetTime = now + limit.duration;
@@ -171,10 +171,10 @@ export function clearAttemptsForOperation(ip: string, operation: keyof typeof RA
     delete rateLimitStore[key];
 }
 
-export function hashPassword(password: string): string {
-    return bcrypt.hashSync(password, 12);
+export async function hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 12);
 }
 
-export function verifyPassword(password: string, hashedPassword: string): boolean {
-    return bcrypt.compareSync(password, hashedPassword);
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+    return bcrypt.compare(password, hashedPassword);
 }

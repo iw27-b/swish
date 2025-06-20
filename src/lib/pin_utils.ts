@@ -12,7 +12,7 @@ export async function userHasPin(userId: string): Promise<boolean> {
         where: { id: userId },
         select: { securityPin: true }
     });
-    
+
     return !!(user?.securityPin);
 }
 
@@ -27,11 +27,13 @@ export async function verifyUserPin(userId: string, providedPin: string): Promis
         where: { id: userId },
         select: { securityPin: true }
     });
-    
+
     if (!user?.securityPin) {
+        // Perform dummy hash operation to maintain consistent timing
+        await verifyPassword('dummy_hash_to_prevent_timing_attacks', providedPin);
         return false;
     }
-    
+
     return await verifyPassword(user.securityPin, providedPin);
 }
 
@@ -43,11 +45,11 @@ export async function verifyUserPin(userId: string, providedPin: string): Promis
  * @returns Promise<{requiresPin: boolean, pinValid: boolean, errorResponse?: Response}>
  */
 export async function validatePinIfRequired(
-    userId: string, 
+    userId: string,
     providedPin?: string,
     options: {
-        alwaysRequire?: boolean; 
-        operation?: string; 
+        alwaysRequire?: boolean;
+        operation?: string;
     } = {}
 ): Promise<{
     requiresPin: boolean;
@@ -56,11 +58,11 @@ export async function validatePinIfRequired(
 }> {
     const { alwaysRequire = false, operation = 'this operation' } = options;
     const hasPin = await userHasPin(userId);
-    
+
     if (!hasPin && !alwaysRequire) {
         return { requiresPin: false, pinValid: true };
     }
-    
+
     if (!providedPin) {
         return {
             requiresPin: true,
@@ -72,7 +74,7 @@ export async function validatePinIfRequired(
             )
         };
     }
-    
+
     if (!hasPin && alwaysRequire) {
         return {
             requiresPin: true,
@@ -84,9 +86,9 @@ export async function validatePinIfRequired(
             )
         };
     }
-    
+
     const pinValid = await verifyUserPin(userId, providedPin);
-    
+
     if (!pinValid) {
         return {
             requiresPin: true,
@@ -98,7 +100,7 @@ export async function validatePinIfRequired(
             )
         };
     }
-    
+
     return { requiresPin: true, pinValid: true };
 }
 
@@ -130,9 +132,9 @@ export async function requirePin(
     providedPin?: string,
     operation: string = 'this operation'
 ): Promise<Response | null> {
-    const validation = await validatePinIfRequired(userId, providedPin, { 
-        alwaysRequire: true, 
-        operation 
+    const validation = await validatePinIfRequired(userId, providedPin, {
+        alwaysRequire: true,
+        operation
     });
     return validation.errorResponse || null;
 }
