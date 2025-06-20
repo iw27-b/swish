@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { UpdateUserSchema, UpdateUserRequestBody } from '@/types/schemas/user_schemas';
+import { VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
 
 /**
  * This route is used to get a specific user's profile.
@@ -14,14 +17,14 @@ import { Role } from '@prisma/client';
 
 export async function GET(
     req: AuthenticatedRequest, 
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
@@ -45,7 +48,6 @@ export async function GET(
             where: { id: userId },
             select: {
                 id: true,
-                email: true,
                 name: true,
                 role: true,
                 createdAt: true,
@@ -55,6 +57,7 @@ export async function GET(
                 isSeller: true,
                 sellerVerificationStatus: true,
                 languagePreference: true,
+                profileImageUrl: true,
             },
         });
 
@@ -89,14 +92,14 @@ export async function GET(
 
 export async function PATCH(
     req: AuthenticatedRequest, 
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId !== userId) {
@@ -116,22 +119,44 @@ export async function PATCH(
             return createErrorResponse('User ID is required', 400);
         }
 
-        const requestBody = await req.json();
+        const clientIP = getClientIP(req.headers);
 
-        if (!validateRequestSize(requestBody)) {
-            return createErrorResponse('Request too large', 413);
+        if (isRateLimitedForOperation(clientIP, 'profile_updates')) {
+            logAuditEvent({
+                action: 'PROFILE_UPDATE_RATE_LIMITED',
+                userId: requestingUser.userId,
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'user',
+                resourceId: userId,
+                timestamp: new Date(),
+            });
+            return createErrorResponse('Too many profile updates. Please try again later.', 429);
         }
 
-        const validationResult = UpdateUserSchema.safeParse(requestBody);
-        if (!validationResult.success) {
-            return createErrorResponse(
-                'Invalid request data',
-                400,
-                validationResult.error.flatten().fieldErrors
-            );
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            return createErrorResponse('Invalid JSON format in request body', 400);
         }
+
+         if (!validateRequestSize(requestBody)) {
+             return createErrorResponse('Request too large', 413);
+         }
+
+         const validationResult = UpdateUserSchema.safeParse(requestBody);
+         if (!validationResult.success) {
+             return createErrorResponse(
+                 'Invalid request data',
+                 400,
+                 validationResult.error.flatten().fieldErrors
+             );
+         }
 
         const { name, languagePreference } = validationResult.data as UpdateUserRequestBody;
+
+        recordAttemptForOperation(clientIP, 'profile_updates');
 
         const existingUser = await prisma.user.findUnique({
             where: { id: userId },
@@ -155,7 +180,6 @@ export async function PATCH(
                 where: { id: userId },
                 select: {
                     id: true,
-                    email: true,
                     name: true,
                     role: true,
                     createdAt: true,
@@ -165,6 +189,7 @@ export async function PATCH(
                     isSeller: true,
                     sellerVerificationStatus: true,
                     languagePreference: true,
+                    profileImageUrl: true,
                 },
             });
             return createSuccessResponse(currentUser, 'No changes detected');
@@ -175,7 +200,6 @@ export async function PATCH(
             data: updateData,
             select: {
                 id: true,
-                email: true,
                 name: true,
                 role: true,
                 createdAt: true,
@@ -185,6 +209,7 @@ export async function PATCH(
                 isSeller: true,
                 sellerVerificationStatus: true,
                 languagePreference: true,
+                profileImageUrl: true,
             },
         });
 
@@ -216,17 +241,17 @@ export async function PATCH(
 
 export async function DELETE(
     req: AuthenticatedRequest, 
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
-        if (requestingUser.role !== Role.ADMIN) {
+        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             logAuditEvent({
                 action: 'UNAUTHORIZED_USER_DELETE_ATTEMPT',
                 userId: requestingUser.userId,
@@ -236,11 +261,35 @@ export async function DELETE(
                 resourceId: userId,
                 timestamp: new Date(),
             });
-            return createErrorResponse('Forbidden: Admin access required', 403);
+            return createErrorResponse('Forbidden: You can only delete your own account', 403);
         }
 
         if (!userId) {
             return createErrorResponse('User ID is required', 400);
+        }
+
+        let requestBody: VerifyPinRequestBody | null = null;
+        try {
+            const body = await req.json();
+            if (body && typeof body === 'object') {
+                const validation = VerifyPinSchema.safeParse(body);
+                if (validation.success) {
+                    requestBody = validation.data;
+                }
+            }
+        } catch {
+        }
+
+        if (requestingUser.userId === userId) {
+            const pinError = await requirePinIfSet(
+                userId,
+                requestBody?.pin,
+                'account deletion'
+            );
+
+            if (pinError) {
+                return pinError;
+            }
         }
 
         const userToDelete = await prisma.user.findUnique({
@@ -277,10 +326,14 @@ export async function DELETE(
             resource: 'user',
             resourceId: userId,
             timestamp: new Date(),
-            details: { deletedUserEmail: userToDelete.email, deletedUserRole: userToDelete.role },
+            details: { 
+                deletedUserEmail: userToDelete.email, 
+                deletedUserRole: userToDelete.role,
+                selfDeletion: requestingUser.userId === userId
+            },
         });
 
-        return createSuccessResponse(null, 'User deleted successfully');
+        return createSuccessResponse(null, 'User account deleted successfully');
 
     } catch (error) {
         console.error('Delete user error:', error);

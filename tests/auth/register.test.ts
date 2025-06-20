@@ -34,6 +34,15 @@ describe('POST /api/auth/register', () => {
             isSeller: false,
             sellerVerificationStatus: null,
             languagePreference: 'en',
+            resetToken: null,
+            resetTokenExpiry: null,
+            shippingAddress: null,
+            paymentMethods: [],
+            securityPin: null,
+            phoneNumber: null,
+            dateOfBirth: null,
+            profileImageUrl: null,
+            bio: null,
         });
 
         const req = new NextRequest('http://localhost:3000/api/auth/register', {
@@ -73,6 +82,15 @@ describe('POST /api/auth/register', () => {
             isSeller: false,
             sellerVerificationStatus: null,
             languagePreference: 'en',
+            resetToken: null,
+            resetTokenExpiry: null,
+            shippingAddress: null,
+            paymentMethods: [],
+            securityPin: null,
+            phoneNumber: null,
+            dateOfBirth: null,
+            profileImageUrl: null,
+            bio: null,
         });
 
         const req = new NextRequest('http://localhost:3000/api/auth/register', {

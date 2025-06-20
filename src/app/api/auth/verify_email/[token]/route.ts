@@ -10,9 +10,9 @@ import prisma from '@/lib/prisma';
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: { token: string } }
+    { params }: { params: Promise<{ token: string }> }
 ) {
-    const { token } = params;
+    const { token } = await params;
 
     if (!token) {
         return NextResponse.json({ message: 'Verification token is required' }, { status: 400 });

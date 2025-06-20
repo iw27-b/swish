@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { hashPassword } from '@/lib/password_utils';
-import { sanitizeEmail, isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { sanitizeEmail } from '@/lib/api_utils';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { RegisterSchema, RegisterRequestBody } from '@/types/schemas/auth_schemas';
 
@@ -69,32 +70,30 @@ export async function POST(req: NextRequest) {
         const { email, password, name } = validationResult.data as RegisterRequestBody;
 
         const sanitizedEmail = sanitizeEmail(email);
-
-        const existingUser = await prisma.user.findUnique({
-            where: { email: sanitizedEmail },
-        });
-
-        if (existingUser) {
+        if (!sanitizedEmail) {
             recordFailedAttempt(clientIP);
-            logAuditEvent({
-                action: 'REGISTRATION_EMAIL_EXISTS',
-                ip: clientIP,
-                userAgent: getUserAgent(req.headers),
-                resource: 'auth',
-                timestamp: new Date(),
-                details: { email: sanitizedEmail },
-            });
-            return createErrorResponse('User already exists', 409);
+            return createErrorResponse('Invalid email format', 400);
         }
 
-        const hashedPassword = await hashPassword(password);
+        // Use transaction for atomicity
+        const user = await prisma.$transaction(async (tx) => {
+            const existingUser = await tx.user.findUnique({
+                where: { email: sanitizedEmail },
+            });
 
-        const user = await prisma.user.create({
-            data: {
-                email: sanitizedEmail,
-                password: hashedPassword,
-                name: name.trim(),
-            },
+            if (existingUser) {
+                throw new Error('User already exists');
+            }
+
+            const hashedPassword = await hashPassword(password);
+
+            return tx.user.create({
+                data: {
+                    email: sanitizedEmail,
+                    password: hashedPassword,
+                    name: name.trim(),
+                },
+            });
         });
 
         const { password: _, ...userWithoutPassword } = user;
@@ -117,6 +116,18 @@ export async function POST(req: NextRequest) {
         );
 
     } catch (error) {
+        if (error instanceof Error && error.message === 'User already exists') {
+            const clientIP = getClientIP(req.headers);
+            recordFailedAttempt(clientIP);
+            logAuditEvent({
+                action: 'REGISTRATION_EMAIL_EXISTS',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'auth',
+                timestamp: new Date(),
+            });
+            return createErrorResponse('User already exists', 409);
+        }
         console.error('Registration error:', error);
         return createErrorResponse('Internal server error', 500);
     }

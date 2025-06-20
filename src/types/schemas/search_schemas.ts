@@ -2,19 +2,15 @@ import { z } from 'zod';
 import { CardCondition, CardRarity, Role } from '@prisma/client';
 
 export const SearchQuerySchema = z.object({
-    // Core search parameters
     query: z.string().min(1, { message: 'Search query is required' }).max(200),
     type: z.enum(['all', 'cards', 'users']).default('all'),
     
-    // Pagination
     page: z.coerce.number().min(1).default(1),
     pageSize: z.coerce.number().min(1).max(50).default(20),
     
-    // Sorting
     sortBy: z.enum(['relevance', 'name', 'price', 'createdAt', 'updatedAt']).default('relevance'),
     sortOrder: z.enum(['asc', 'desc']).default('desc'),
     
-    // Card-specific filters
     cardFilters: z.object({
         teams: z.array(z.string()).optional(),
         players: z.array(z.string()).optional(),
@@ -29,7 +25,6 @@ export const SearchQuerySchema = z.object({
         ownerId: z.string().cuid().optional(), // Search cards by specific owner
     }).optional(),
     
-    // User-specific filters
     userFilters: z.object({
         roles: z.array(z.nativeEnum(Role)).optional(),
         isSeller: z.coerce.boolean().optional(),
@@ -40,14 +35,12 @@ export const SearchQuerySchema = z.object({
         languagePreference: z.enum(['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh']).optional(),
     }).optional(),
     
-    // Advanced search options
-    exactMatch: z.coerce.boolean().default(false), // Exact vs fuzzy matching
-    includeInactive: z.coerce.boolean().default(false), // Include unverified users, etc.
+    exactMatch: z.coerce.boolean().default(false), 
+    includeInactive: z.coerce.boolean().default(false), 
 });
 
 export type SearchQuery = z.infer<typeof SearchQuerySchema>;
 
-// Search result schemas
 export const CardSearchResultSchema = z.object({
     id: z.string(),
     name: z.string(),
@@ -72,7 +65,6 @@ export const CardSearchResultSchema = z.object({
         profileImageUrl: z.string().nullable(),
         isSeller: z.boolean().nullable(),
     }),
-    // Search metadata
     relevanceScore: z.number().optional(),
     matchedFields: z.array(z.string()).optional(),
 });
@@ -97,7 +89,6 @@ export const UserSearchResultSchema = z.object({
         collections: z.number(),
         cards: z.number(),
     }),
-    // Search metadata
     relevanceScore: z.number().optional(),
     matchedFields: z.array(z.string()).optional(),
 });

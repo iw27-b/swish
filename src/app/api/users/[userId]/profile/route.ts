@@ -1,10 +1,13 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
-import { UpdateExtendedUserSchema, UpdateExtendedUserRequestBody, SetSecurityPinSchema, SetSecurityPinRequestBody } from '@/types/schemas/user_extended_schemas';
+import { UpdateExtendedUserSchema, UpdateExtendedUserRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { hashPassword } from '@/lib/password_utils';
+import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
+
+type CombinedRequestBody = UpdateExtendedUserRequestBody & { pin?: string };
 
 /**
  * Get user's extended profile information
@@ -14,14 +17,14 @@ import { Role } from '@prisma/client';
  */
 export async function GET(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
@@ -32,7 +35,6 @@ export async function GET(
             where: { id: userId },
             select: {
                 id: true,
-                email: true,
                 name: true,
                 role: true,
                 createdAt: true,
@@ -42,14 +44,12 @@ export async function GET(
                 isSeller: true,
                 sellerVerificationStatus: true,
                 languagePreference: true,
-                phoneNumber: true,
-                dateOfBirth: true,
                 profileImageUrl: true,
                 bio: true,
-                shippingAddress: true,
-                paymentMethods: true,
-                securityPin: true,
-                // Include counts for social features
+                // Removed: email, phoneNumber, dateOfBirth, shippingAddress, paymentMethods, securityPin
+                // These are now available through separate secure endpoints
+                
+                // Include counts for social features (safe data)
                 _count: {
                     select: {
                         followers: true,
@@ -68,10 +68,14 @@ export async function GET(
             return createErrorResponse('User not found', 404);
         }
 
-        const { securityPin, ...userWithoutPin } = user;
+        const pinCheck = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { securityPin: true }
+        });
+
         const userResponse = {
-            ...userWithoutPin,
-            hasSecurityPin: !!securityPin
+            ...user,
+            hasSecurityPin: !!pinCheck?.securityPin
         };
 
         logAuditEvent({
@@ -93,24 +97,24 @@ export async function GET(
 }
 
 /**
- * Update user's extended profile information
+ * Update user's extended profile
  * @param req AuthenticatedRequest - The authenticated request
  * @param params - The user ID
  * @returns JSON response with updated profile or error
  */
 export async function PATCH(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
-        if (requestingUser.userId !== userId) {
+        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only update your own profile', 403);
         }
 
@@ -125,7 +129,9 @@ export async function PATCH(
             return createErrorResponse('Request too large', 413);
         }
 
-        const validationResult = UpdateExtendedUserSchema.safeParse(requestBody);
+        const { pin: pinProvided, ...profileData } = requestBody as CombinedRequestBody;
+
+        const validationResult = UpdateExtendedUserSchema.safeParse(profileData);
         if (!validationResult.success) {
             return createErrorResponse(
                 'Invalid request data',
@@ -134,122 +140,66 @@ export async function PATCH(
             );
         }
 
-        const { 
-            name, 
-            languagePreference, 
-            phoneNumber, 
-            dateOfBirth, 
-            bio, 
-            profileImageUrl, 
-            shippingAddress 
-        } = validationResult.data as UpdateExtendedUserRequestBody;
+        const updateData = validationResult.data;
 
-        const existingUser = await prisma.user.findUnique({
+        if (Object.prototype.hasOwnProperty.call(updateData, 'shippingAddress')) {
+            const pinError = await requirePinIfSet(
+                userId,
+                pinProvided,
+                'shipping address update'
+            );
+
+            if (pinError) {
+                return pinError;
+            }
+        }
+
+        const currentUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { 
-                id: true, 
-                name: true, 
+            select: {
+                id: true,
+                name: true,
                 languagePreference: true,
                 phoneNumber: true,
                 dateOfBirth: true,
                 bio: true,
                 profileImageUrl: true,
-                shippingAddress: true
-            }
+                shippingAddress: true,
+            },
         });
 
-        if (!existingUser) {
+        if (!currentUser) {
             return createErrorResponse('User not found', 404);
         }
 
-        const updateData: any = {};
-        if (name !== undefined && name !== existingUser.name) {
-            updateData.name = name.trim();
-        }
-        if (languagePreference !== undefined && languagePreference !== existingUser.languagePreference) {
-            updateData.languagePreference = languagePreference;
-        }
-        if (phoneNumber !== undefined && phoneNumber !== existingUser.phoneNumber) {
-            updateData.phoneNumber = phoneNumber;
-        }
-        if (dateOfBirth !== undefined && dateOfBirth !== existingUser.dateOfBirth) {
-            updateData.dateOfBirth = dateOfBirth;
-        }
-        if (bio !== undefined && bio !== existingUser.bio) {
-            updateData.bio = bio?.trim();
-        }
-        if (profileImageUrl !== undefined && profileImageUrl !== existingUser.profileImageUrl) {
-            updateData.profileImageUrl = profileImageUrl;
-        }
-        if (shippingAddress !== undefined) {
-            updateData.shippingAddress = shippingAddress;
-        }
+        const updatedFields: string[] = [];
+        const finalUpdateData: any = {};
 
-        if (Object.keys(updateData).length === 0) {
-            const currentUser = await prisma.user.findUnique({
-                where: { id: userId },
-                select: {
-                    id: true,
-                    email: true,
-                    name: true,
-                    role: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    emailVerified: true,
-                    twoFactorEnabled: true,
-                    isSeller: true,
-                    sellerVerificationStatus: true,
-                    languagePreference: true,
-                    phoneNumber: true,
-                    dateOfBirth: true,
-                    profileImageUrl: true,
-                    bio: true,
-                    shippingAddress: true,
-                    paymentMethods: true,
-                    securityPin: true,
-                },
-            });
-            
-            if (currentUser) {
-                const { securityPin, ...userWithoutPin } = currentUser;
-                const userResponse = {
-                    ...userWithoutPin,
-                    hasSecurityPin: !!securityPin
-                };
-                return createSuccessResponse(userResponse, 'No changes detected');
+        Object.entries(updateData).forEach(([key, value]) => {
+            if (value !== undefined && value !== (currentUser as any)[key]) {
+                finalUpdateData[key] = value;
+                updatedFields.push(key);
             }
+        });
+
+        if (Object.keys(finalUpdateData).length === 0) {
+            return createSuccessResponse(currentUser, 'No changes detected');
         }
 
         const updatedUser = await prisma.user.update({
             where: { id: userId },
-            data: updateData,
+            data: finalUpdateData,
             select: {
                 id: true,
-                email: true,
                 name: true,
-                role: true,
-                createdAt: true,
-                updatedAt: true,
-                emailVerified: true,
-                twoFactorEnabled: true,
-                isSeller: true,
-                sellerVerificationStatus: true,
                 languagePreference: true,
                 phoneNumber: true,
                 dateOfBirth: true,
-                profileImageUrl: true,
                 bio: true,
+                profileImageUrl: true,
                 shippingAddress: true,
-                paymentMethods: true,
-                securityPin: true,
             },
         });
-
-        const { securityPin, ...userWithoutPin } = updatedUser;
-        const userResponse = {
-            ...userWithoutPin,
-            hasSecurityPin: !!securityPin
-        };
 
         logAuditEvent({
             action: 'USER_EXTENDED_PROFILE_UPDATED',
@@ -259,10 +209,10 @@ export async function PATCH(
             resource: 'user',
             resourceId: userId,
             timestamp: new Date(),
-            details: { updatedFields: Object.keys(updateData) },
+            details: { updatedFields },
         });
 
-        return createSuccessResponse(userResponse, 'Extended profile updated successfully');
+        return createSuccessResponse(updatedUser, 'Extended profile updated successfully');
 
     } catch (error) {
         console.error('Update extended profile error:', error);

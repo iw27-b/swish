@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { ForgotPasswordSchema, ForgotPasswordRequestBody } from '@/types/schemas/user_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { sanitizeEmail, isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { sanitizeEmail } from '@/lib/api_utils';
 import crypto from 'crypto';
 
 async function sendPasswordResetEmail(email: string, token: string) {
@@ -51,7 +52,21 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Request too large', 413);
         }
 
-        const requestBody = await req.json();
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            recordFailedAttempt(clientIP);
+            logAuditEvent({
+                action: 'PASSWORD_RESET_INVALID_JSON',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'auth',
+                timestamp: new Date(),
+                details: { error: 'Invalid JSON format' },
+            });
+            return createErrorResponse('Invalid JSON format in request body', 400);
+        }
 
         const validationResult = ForgotPasswordSchema.safeParse(requestBody);
         if (!validationResult.success) {
@@ -65,6 +80,10 @@ export async function POST(req: NextRequest) {
 
         const { email } = validationResult.data as ForgotPasswordRequestBody;
         const sanitizedEmail = sanitizeEmail(email);
+        if (!sanitizedEmail) {
+            recordFailedAttempt(clientIP);
+            return createErrorResponse('Invalid email format', 400);
+        }
 
         const user = await prisma.user.findUnique({
             where: { email: sanitizedEmail },

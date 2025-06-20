@@ -13,14 +13,14 @@ import { Role } from '@prisma/client';
  */
 export async function GET(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         const url = new URL(req.url);
@@ -133,14 +133,14 @@ export async function GET(
  */
 export async function POST(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId === userId) {
@@ -212,14 +212,14 @@ export async function POST(
  */
 export async function DELETE(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         const existingFollow = await prisma.userFollow.findUnique({

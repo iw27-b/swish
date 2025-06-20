@@ -14,6 +14,50 @@ export const UpdateUserSchema = z.object({
 
 export type UpdateUserRequestBody = z.infer<typeof UpdateUserSchema>;
 
+export const UpdateSensitiveUserSchema = z.object({
+    name: z.string()
+        .min(1, { message: 'Name is required' })
+        .max(100, { message: 'Name must be less than 100 characters' })
+        .regex(/^[\p{L}\p{M}\s'-]+$/u, { message: 'Name can only contain letters, spaces, hyphens, and apostrophes' })
+        .optional(),
+    languagePreference: z.enum(['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh'])
+        .default('en')
+        .optional(),
+    profileImageUrl: z.string().url().optional().or(z.literal('')),
+    
+    email: z.string()
+        .email({ message: 'Invalid email address' })
+        .min(5, { message: 'Email must be at least 5 characters long' })
+        .max(254, { message: 'Email must be less than 254 characters' })
+        .optional(),
+    phoneNumber: z.string()
+        .regex(/^\+?[\d\s\-\(\)]{7,20}$/, { message: 'Invalid phone number format' })
+        .optional()
+        .or(z.literal('')),
+    dateOfBirth: z.string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date of birth must be in YYYY-MM-DD format' })
+        .optional()
+        .or(z.literal('')),
+    bio: z.string()
+        .max(500, { message: 'Bio must be less than 500 characters' })
+        .optional()
+        .or(z.literal('')),
+    
+    shippingAddress: z.object({
+        street: z.string().min(1, { message: 'Street address is required' }),
+        city: z.string().min(1, { message: 'City is required' }),
+        state: z.string().min(1, { message: 'State is required' }),
+        zipCode: z.string().min(5, { message: 'ZIP code must be at least 5 characters' }),
+        country: z.string().min(2, { message: 'Country is required' }),
+    }).optional(),
+    
+    securityPin: z.string()
+        .regex(/^\d{4,6}$/, { message: 'Security PIN must be 4-6 digits' })
+        .optional(),
+});
+
+export type UpdateSensitiveUserRequestBody = z.infer<typeof UpdateSensitiveUserSchema>;
+
 export const ChangePasswordSchema = z.object({
     currentPassword: z.string().min(1, { message: 'Current password is required' }),
     newPassword: z.string()
@@ -84,8 +128,8 @@ export const UserResponseSchema = z.object({
     dateOfBirth: z.date().nullable(),
     profileImageUrl: z.string().nullable(),
     bio: z.string().nullable(),
-    shippingAddress: z.any().nullable(), // JSON field
-    paymentMethods: z.array(z.any()).nullable(), // JSON array
+    shippingAddress: z.any().nullable(),
+    paymentMethods: z.array(z.any()).nullable(),
     hasSecurityPin: z.boolean().optional(),
 });
 

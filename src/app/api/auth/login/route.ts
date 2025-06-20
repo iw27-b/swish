@@ -1,15 +1,17 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPassword } from '@/lib/password_utils';
-import { generateToken, sanitizeEmail, isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { generateEdgeToken, generateEdgeRefreshToken } from '@/lib/edge_auth_utils';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { sanitizeEmail } from '@/lib/api_utils';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
 import { LoginSchema, LoginRequestBody } from '@/types/schemas/auth_schemas';
 
 /**
- * Handles user login with enhanced security and rate limiting
+ * Handles user login with secure HttpOnly cookie authentication
  * @param req The Next.js request object
- * @returns JSON response with authentication token and user data or error
+ * @returns JSON response with login success boolean (NO USER DATA) and sets secure cookies
  */
 export async function POST(req: NextRequest) {
     try {
@@ -69,6 +71,10 @@ export async function POST(req: NextRequest) {
         const { email, password } = validationResult.data as LoginRequestBody;
 
         const sanitizedEmail = sanitizeEmail(email);
+        if (!sanitizedEmail) {
+            recordFailedAttempt(clientIP);
+            return createErrorResponse('Invalid email format', 400);
+        }
 
         const user = await prisma.user.findUnique({
             where: { email: sanitizedEmail },
@@ -104,9 +110,9 @@ export async function POST(req: NextRequest) {
 
         clearFailedAttempts(clientIP);
 
-        const token = generateToken(user.id, user.role as Role);
-
-        const { password: _, ...userWithoutPassword } = user;
+        // Generate tokens for secure cookie storage using Edge Runtime compatible functions
+        const accessToken = await generateEdgeToken(user.id, user.role as Role);
+        const refreshToken = await generateEdgeRefreshToken(user.id, user.role as Role);
 
         logAuditEvent({
             action: 'LOGIN_SUCCESS',
@@ -117,10 +123,44 @@ export async function POST(req: NextRequest) {
             timestamp: new Date(),
         });
 
-        return createSuccessResponse({
-            token,
-            user: userWithoutPassword,
+        // Create minimal response - NO SENSITIVE USER DATA
+        const response = createSuccessResponse({
+            loginSuccess: true,
         }, 'Login successful');
+
+        // Set secure HttpOnly access token cookie
+        response.cookies.set('access_token', accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60, // 15 minutes
+            path: '/'
+        });
+
+        // Set secure HttpOnly refresh token cookie
+        response.cookies.set('refresh_token', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60, // 7 days
+            path: '/'
+        });
+
+        // Set minimal user data cookie for client-side access (ONLY safe, non-sensitive data)
+        response.cookies.set('user_data', JSON.stringify({
+            id: user.id,                    // Safe: Just an identifier
+            name: user.name,                // Safe: Display name
+            role: user.role,                // Safe: Needed for UI permissions
+            isEmailVerified: user.emailVerified  // Safe: UI state only
+        }), {
+            httpOnly: false, // Accessible to client for UI purposes
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60, // Same as access token
+            path: '/'
+        });
+
+        return response;
 
     } catch (error) {
         console.error('Login error:', error);

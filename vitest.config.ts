@@ -8,7 +8,8 @@ export default defineConfig({
         globals: true,
         environment: 'jsdom',
         env: {
-            JWT_SECRET: 'test-jwt-secret-key-for-testing-purposes-only',
+            JWT_SECRET: 'uNwENBngDJuxa2vsk4DTssUIhp0R90/GiEb1h0qxseg=',
+            JWT_REFRESH_SECRET: 'RefreshKey123456789AbCdEfGhIjKlMnOpQrStUvWxYz=',
         },
         setupFiles: ['./tests/setup.ts'],
     },

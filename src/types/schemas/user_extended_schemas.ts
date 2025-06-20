@@ -71,6 +71,14 @@ export const SetSecurityPinSchema = z.object({
 
 export type SetSecurityPinRequestBody = z.infer<typeof SetSecurityPinSchema>;
 
+export const VerifyPinSchema = z.object({
+    pin: z.string()
+        .length(6, { message: 'PIN must be exactly 6 digits' })
+        .regex(/^\d{6}$/, { message: 'PIN must contain only numbers' }),
+});
+
+export type VerifyPinRequestBody = z.infer<typeof VerifyPinSchema>;
+
 export const CreateCollectionSchema = z.object({
     name: z.string().min(1, { message: 'Collection name is required' }).max(100),
     description: z.string().max(500).optional(),

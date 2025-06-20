@@ -13,14 +13,14 @@ import { Role } from '@prisma/client';
  */
 export async function GET(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
@@ -40,6 +40,14 @@ export async function GET(
         }
 
         const { page, pageSize, status, startDate, endDate, sortBy, sortOrder } = validationResult.data;
+
+        const ALLOWED_SORT_FIELDS = {
+            'createdAt': 'createdAt',
+            'price': 'price',
+            'status': 'status'
+        } as const;
+
+        const safeSortBy = ALLOWED_SORT_FIELDS[sortBy as keyof typeof ALLOWED_SORT_FIELDS] || 'createdAt';
 
         const purchaseWhere: any = { buyerId: userId };
         if (status) purchaseWhere.status = status;
@@ -76,8 +84,8 @@ export async function GET(
                         }
                     }
                 },
-                orderBy: { [sortBy]: sortOrder },
-                skip: (page - 1) * Math.floor(pageSize / 2), // Split page size between purchases and sales
+                orderBy: { [safeSortBy]: sortOrder },
+                skip: (page - 1) * Math.floor(pageSize / 2), 
                 take: Math.floor(pageSize / 2),
             }),
             prisma.purchase.findMany({
@@ -104,9 +112,9 @@ export async function GET(
                         }
                     }
                 },
-                orderBy: { [sortBy]: sortOrder },
+                orderBy: { [safeSortBy]: sortOrder },
                 skip: (page - 1) * Math.floor(pageSize / 2),
-                take: Math.ceil(pageSize / 2), // Give remainder to sales
+                take: Math.ceil(pageSize / 2), 
             }),
             prisma.purchase.count({ where: purchaseWhere }),
             prisma.purchase.count({ where: salesWhere })
@@ -116,12 +124,12 @@ export async function GET(
             ...purchases.map(p => ({ ...p, type: 'purchase' as const })),
             ...sales.map(s => ({ ...s, type: 'sale' as const }))
         ].sort((a, b) => {
-            if (sortBy === 'createdAt') {
+            if (safeSortBy === 'createdAt') {
                 return sortOrder === 'desc' 
                     ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                     : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
             }
-            if (sortBy === 'price') {
+            if (safeSortBy === 'price') {
                 return sortOrder === 'desc' ? b.price - a.price : a.price - b.price;
             }
             return 0;

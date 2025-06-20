@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
-import { SetSecurityPinSchema, SetSecurityPinRequestBody } from '@/types/schemas/user_extended_schemas';
+import { SetSecurityPinSchema, SetSecurityPinRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { hashPassword, verifyPassword } from '@/lib/password_utils';
+import { requirePinIfSet } from '@/lib/pin_utils';
+import { hashPassword } from '@/lib/password_utils';
+import { Role } from '@prisma/client';
 
 /**
  * Set or update user's security PIN
@@ -13,14 +15,14 @@ import { hashPassword, verifyPassword } from '@/lib/password_utils';
  */
 export async function POST(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
         if (requestingUser.userId !== userId) {
@@ -75,39 +77,51 @@ export async function POST(
 }
 
 /**
- * Remove user's security PIN
+ * Remove security PIN (requires current PIN)
  * @param req AuthenticatedRequest - The authenticated request
  * @param params - The user ID
- * @returns JSON response with success message or error
+ * @returns JSON response with success or error message
  */
 export async function DELETE(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
+    { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
+        const { userId } = await params;
         const requestingUser = req.user;
 
-        if (requestingUser.userId !== userId) {
+        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only remove your own security PIN', 403);
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { securityPin: true }
-        });
-
-        if (!user?.securityPin) {
-            return createErrorResponse('No security PIN is set', 404);
+        let requestBody: { pin?: string } = {};
+        try {
+            const body = await req.json();
+            if (body && typeof body === 'object') {
+                requestBody = body;
+            }
+        } catch {
         }
+
+        if (requestingUser.role !== Role.ADMIN) {
+            const pinError = await requirePinIfSet(
+                userId,
+                requestBody.pin,
+                'PIN removal'
+            );
+ 
+            if (pinError) {
+                return pinError;
+            }
+         }
 
         await prisma.user.update({
             where: { id: userId },
-            data: { securityPin: null }
+            data: { securityPin: null },
         });
 
         logAuditEvent({

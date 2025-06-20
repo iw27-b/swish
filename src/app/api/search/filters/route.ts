@@ -17,7 +17,6 @@ export async function GET(req: AuthenticatedRequest) {
 
         const requestingUser = req.user;
 
-        // Get all available filter options in parallel
         const [
             teams,
             players,
@@ -150,7 +149,6 @@ export async function GET(req: AuthenticatedRequest) {
                 }
             },
             
-            // User filters
             userFilters: {
                 roles: Object.values(Role).map(role => ({
                     value: role,
@@ -189,7 +187,6 @@ export async function GET(req: AuthenticatedRequest) {
                 }
             },
             
-            // Search statistics
             statistics: {
                 totalCards: await prisma.card.count(),
                 totalUsers: await prisma.user.count({ where: { emailVerified: true } }),

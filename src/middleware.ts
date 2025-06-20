@@ -1,120 +1,162 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyToken } from '@/lib/auth_utils';
+import { verifyEdgeToken, parseTokenFromCookie } from '@/lib/edge_auth_utils';
 import { hasPermission } from '@/lib/rbac';
 import { Role } from '@prisma/client';
-import { AuthenticatedRequest, JwtPayload } from '@/types';
+import { JwtPayload } from '@/types';
 
-const protectedPaths: string[] = [
-    '/api/users',
-    '/api/auth/send_verification_email',
-    '/api/auth/logout',
-    '/api/auth/change-password',
-    '/api/cards',
-    '/api/trades',
-    '/api/collections',
+const publicPaths: string[] = [
+    '/api/health',
+    '/api/health/db',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/forgot-password',
+    '/api/auth/reset-password',
+    '/api/auth/verify_email',
+    '/api/auth/refresh', 
+    '/api/cards', 
+    '/api/marketplace', 
 ];
 
-// const adminPaths: string[] = []; 
+export async function middleware(req: NextRequest) {
+    const path = req.nextUrl.pathname;
+    const method = req.method;
 
-export async function middleware(req: AuthenticatedRequest) {
-  const path = req.nextUrl.pathname;
-  const method = req.method;
-
-  const isProtected = protectedPaths.some(p => path.startsWith(p));
-
-  if (isProtected) {
-    const authHeader = req.headers.get('authorization');
-    const token = authHeader?.split(' ')?.[1];
-
-    if (!token) {
-      return NextResponse.json({ message: 'Authentication required' }, { status: 401 });
+    if (!path.startsWith('/api/')) {
+        return NextResponse.next();
     }
 
-    const decodedPayload: JwtPayload | null = verifyToken(token);
+    const isPublic = publicPaths.some(p => {
+        if (p === '/api/cards' && method === 'GET') {
+            return path === '/api/cards'; 
+        }
+        return path.startsWith(p);
+    });
+
+    if (isPublic) {
+        return NextResponse.next();
+    }
+
+    let accessToken = parseTokenFromCookie(req.headers.get('cookie'), 'access_token');
+
+    if (!accessToken) {
+        const authHeader = req.headers.get('authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            accessToken = authHeader.substring(7);
+        }
+    }
+
+    if (!accessToken) {
+        return NextResponse.json({ 
+            success: false,
+            message: 'Authentication required' 
+        }, { status: 401 });
+    }
+
+    const decodedPayload: JwtPayload | null = await verifyEdgeToken(accessToken);
+    
     if (!decodedPayload) {
-      return NextResponse.json({ message: 'Invalid or expired token' }, { status: 401 });
+        const refreshToken = parseTokenFromCookie(req.headers.get('cookie'), 'refresh_token');
+        
+        if (!refreshToken || !(await verifyEdgeToken(refreshToken))) {
+            const response = NextResponse.json({ 
+                success: false,
+                message: 'Invalid or expired token' 
+            }, { status: 401 });
+            
+            response.cookies.delete('access_token');
+            response.cookies.delete('refresh_token');
+            response.cookies.delete('user_data');
+            
+            return response;
+        }
+        
+        const refreshUrl = new URL('/api/auth/refresh', req.url);
+        refreshUrl.searchParams.set('redirect', path);
+        return NextResponse.redirect(refreshUrl);
     }
-        req.user = decodedPayload;
 
     let resource = '';
     let action = '';
 
     if (path.startsWith('/api/users')) {
-            resource = 'profile';
-            const isSpecificUserPath = path.split('/').length > 3;
-      
-      if (method === 'GET') {
-                action = isSpecificUserPath ? 'read:own' : 'list:any';
-                if (decodedPayload.role === Role.ADMIN && isSpecificUserPath) action = 'read:any';
-      }
-            if (method === 'PATCH') action = 'update:own';
-            if (method === 'DELETE') action = 'delete:any';
-    
-            if (resource === 'profile' && action === 'list:any' && decodedPayload.role === Role.ADMIN) {
-                resource = 'users';
-         action = 'manage:any';
-      } 
-    } else if (path.startsWith('/api/auth/send_verification_email')) {
-      resource = 'auth';
-            action = 'request:emailVerification';
-        } else if (path.startsWith('/api/auth/logout')) {
-            resource = 'auth';
-            action = 'logout';
-        } else if (path.startsWith('/api/auth/change-password')) {
-            resource = 'auth';
-            action = 'change:password';
-        } else if (path.startsWith('/api/cards')) {
-            if (method === 'GET') {
-                resource = 'cards';
-                action = 'read:own';
-            } else if (method === 'POST') {
-                resource = 'cards';
-                action = 'create:own';
-            } else if (method === 'PATCH' || method === 'DELETE') {
-                resource = 'cards';
-                action = method === 'PATCH' ? 'update:own' : 'delete:own';
-            }
-        } else if (path.startsWith('/api/trades')) {
-            resource = 'trades';
-            if (method === 'GET') action = 'read:own';
-            if (method === 'POST') action = 'create:own';
-            if (method === 'PATCH') action = 'update:own';
-            if (method === 'DELETE') action = 'delete:own';
-        } else if (path.startsWith('/api/collections')) {
-            resource = 'collections';
-            if (method === 'GET') action = 'read:own';
-            if (method === 'POST') action = 'create:own';
-            if (method === 'PATCH') action = 'update:own';
-            if (method === 'DELETE') action = 'delete:own';
+        resource = 'profile';
+        const isSpecificUserPath = path.split('/').length > 3;
+        
+        if (method === 'GET') {
+            action = isSpecificUserPath ? 'read:own' : 'list:any';
+            if (decodedPayload.role === Role.ADMIN && isSpecificUserPath) action = 'read:any';
         }
+        if (method === 'PATCH') action = 'update:own';
+        if (method === 'DELETE') action = 'delete:any';
+
+        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === Role.ADMIN) {
+            resource = 'users';
+            action = 'manage:any';
+        } 
+    } else if (path.startsWith('/api/auth/send_verification_email')) {
+        resource = 'auth';
+        action = 'request:emailVerification';
+    } else if (path.startsWith('/api/auth/logout')) {
+        resource = 'auth';
+        action = 'logout';
+    } else if (path.startsWith('/api/auth/change-password')) {
+        resource = 'auth';
+        action = 'change:password';
+    } else if (path.startsWith('/api/cards')) {
+        if (method === 'GET') {
+            resource = 'cards';
+            action = 'read:own';
+        } else if (method === 'POST') {
+            resource = 'cards';
+            action = 'create:own';
+        } else if (method === 'PATCH' || method === 'DELETE') {
+            resource = 'cards';
+            action = method === 'PATCH' ? 'update:own' : 'delete:own';
+        }
+    } else if (path.startsWith('/api/search')) {
+        resource = 'search';
+        action = 'read:own';
+    } else if (path.startsWith('/api/trades')) {
+        resource = 'trades';
+        if (method === 'GET') {
+            action = 'read:own';
+        } else if (method === 'POST') {
+            action = 'create:own';
+        } else if (method === 'PATCH' || method === 'DELETE') {
+            action = 'update:own';
+        }
+    } else if (path.startsWith('/api/purchases')) {
+        resource = 'purchases';
+        if (method === 'GET') {
+            action = 'read:own';
+        } else if (method === 'POST') {
+            action = 'create:own';
+        } else if (method === 'PATCH') {
+            action = 'update:own';
+        }
+    }
 
     if (resource && action) {
-      if (!hasPermission(decodedPayload.role, resource, action, req, decodedPayload)) {
-        let message = 'Forbidden: You do not have permission to perform this action.';
-        if (action.includes(':own') && resource === 'profile') {
-            message = 'Forbidden: You can only perform this action on your own profile.';
+        if (!hasPermission(decodedPayload.role, resource, action, req, decodedPayload)) {
+            let message = 'Forbidden: You do not have permission to perform this action.';
+            if (action.includes(':own') && resource === 'profile') {
+                message = 'Forbidden: You can only perform this action on your own profile.';
+            }
+            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== Role.ADMIN) {
+                message = 'Forbidden: Admin access required.';
+            }
+            return NextResponse.json({ 
+                success: false,
+                message 
+            }, { status: 403 });
         }
-                if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== Role.ADMIN) {
-            message = 'Forbidden: Admin access required.';
-        }
-        return NextResponse.json({ message }, { status: 403 });
-      }
-    } else if (path.startsWith('/api/')) {
-        console.warn(`Unmapped protected route: ${method} ${path}`);
-        return NextResponse.json({ message: 'Forbidden: Permission check not configured for this route.' }, { status: 403 });
     }
-  }
-  return NextResponse.next();
+    
+    return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/api/users/:path*',
-    '/api/auth/send_verification_email',
-        '/api/auth/logout',
-        '/api/auth/change-password',
-        '/api/cards/:path*',
-        '/api/trades/:path*',
-        '/api/collections/:path*',
-  ],
+    matcher: [
+        '/api/:path*', 
+    ],
 }; 

@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
-import { UpdateCollectionSchema, UpdateCollectionRequestBody } from '@/types/schemas/user_extended_schemas';
+import { UpdateCollectionSchema, UpdateCollectionRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
 
 /**
@@ -13,14 +14,14 @@ import { Role } from '@prisma/client';
  */
 export async function GET(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string; collectionId: string } }
+    { params }: { params: Promise<{ userId: string; collectionId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId, collectionId } = params;
+        const { userId, collectionId } = await params;
         const requestingUser = req.user;
 
         const collection = await prisma.collection.findUnique({
@@ -78,12 +79,11 @@ export async function GET(
             return createErrorResponse('Collection not found', 404);
         }
 
-        // Check access permissions
         const hasAccess = 
-            collection.ownerId === requestingUser.userId || // Owner
-            requestingUser.role === Role.ADMIN || // Admin
-            collection.isPublic || // Public collection
-            collection.sharedWith.some(share => share.userId === requestingUser.userId); // Shared with user
+            collection.ownerId === requestingUser.userId || 
+            requestingUser.role === Role.ADMIN || 
+            collection.isPublic || 
+            collection.sharedWith.some(share => share.userId === requestingUser.userId); 
 
         if (!hasAccess) {
             return createErrorResponse('Forbidden: You do not have access to this collection', 403);
@@ -115,14 +115,14 @@ export async function GET(
  */
 export async function PATCH(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string; collectionId: string } }
+    { params }: { params: Promise<{ userId: string; collectionId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId, collectionId } = params;
+        const { userId, collectionId } = await params;
         const requestingUser = req.user;
 
         let requestBody;
@@ -156,13 +156,12 @@ export async function PATCH(
             return createErrorResponse('Collection not found', 404);
         }
 
-        // Check edit permissions
         const canEdit = 
-            collection.ownerId === requestingUser.userId || // Owner
-            requestingUser.role === Role.ADMIN || // Admin
+            collection.ownerId === requestingUser.userId || 
+            requestingUser.role === Role.ADMIN || 
             collection.sharedWith.some(share => 
                 share.userId === requestingUser.userId && share.canEdit
-            ); // Shared with edit permission
+            ); 
 
         if (!canEdit) {
             return createErrorResponse('Forbidden: You do not have permission to edit this collection', 403);
@@ -170,7 +169,6 @@ export async function PATCH(
 
         const { name, description, isPublic, imageUrl } = validationResult.data as UpdateCollectionRequestBody;
 
-        // If changing name, check for duplicates
         if (name && name !== collection.name) {
             const existingCollection = await prisma.collection.findFirst({
                 where: {
@@ -228,48 +226,63 @@ export async function PATCH(
 }
 
 /**
- * Delete a specific collection
+ * Delete a collection
  * @param req AuthenticatedRequest - The authenticated request
  * @param params - The user ID and collection ID
- * @returns JSON response with success message or error
+ * @returns JSON response with success or error message
  */
 export async function DELETE(
     req: AuthenticatedRequest,
-    { params }: { params: { userId: string; collectionId: string } }
+    { params }: { params: Promise<{ userId: string; collectionId: string }> }
 ) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId, collectionId } = params;
+        const { userId, collectionId } = await params;
         const requestingUser = req.user;
+
+        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
+            return createErrorResponse('Forbidden: You can only delete your own collections', 403);
+        }
+
+        let requestBody: { pin?: string } = {};
+        try {
+            const body = await req.json();
+            if (body && typeof body === 'object') {
+                requestBody = body;
+            }
+        } catch {
+        }
+
+        if (requestingUser.userId === userId) {
+            const pinError = await requirePinIfSet(
+                userId,
+                requestBody.pin,
+                'collection deletion'
+            );
+
+            if (pinError) {
+                return pinError;
+            }
+        }
 
         const collection = await prisma.collection.findUnique({
             where: { id: collectionId },
-            select: {
-                id: true,
-                name: true,
-                ownerId: true,
-                _count: {
-                    select: {
-                        cards: true
-                    }
-                }
-            }
+            include: { _count: { select: { cards: true } } },
         });
 
         if (!collection) {
             return createErrorResponse('Collection not found', 404);
         }
 
-        // Only owner or admin can delete
-        if (collection.ownerId !== requestingUser.userId && requestingUser.role !== Role.ADMIN) {
+        if (collection.ownerId !== userId) {
             return createErrorResponse('Forbidden: You can only delete your own collections', 403);
         }
 
         await prisma.collection.delete({
-            where: { id: collectionId }
+            where: { id: collectionId },
         });
 
         logAuditEvent({
@@ -280,7 +293,10 @@ export async function DELETE(
             resource: 'collection',
             resourceId: collectionId,
             timestamp: new Date(),
-            details: { name: collection.name, cardCount: collection._count.cards }
+            details: {
+                name: collection.name,
+                cardCount: collection._count.cards,
+            },
         });
 
         return createSuccessResponse(null, 'Collection deleted successfully');

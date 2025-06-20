@@ -171,8 +171,6 @@ export async function GET(req: NextRequest) {
 /**
  * Handles POST requests to create a new card listing.
  * 
- * CAUTION: will be moved to /api/cards/new OR /api/card/new
- * 
  * @param req AuthenticatedRequest - The authenticated user making the request.
  * @returns JSON response with success or error message.
  */
@@ -210,39 +208,36 @@ export async function POST(req: AuthenticatedRequest) {
 
         const cardData = validationResult.data as CreateCardRequestBody;
 
-        // TODO: Uncomment when Card model is added to Prisma schema
-        // const card = await prisma.card.create({
-        //     data: {
-        //         ...cardData,
-        //         ownerId: userId,
-        //     },
-        //     include: {
-        //         owner: {
-        //             select: {
-        //                 id: true,
-        //                 name: true,
-        //                 email: true,
-        //             }
-        //         }
-        //     },
-        // });
+        const card = await prisma.$transaction(async (tx) => {
+            return await tx.card.create({
+                data: {
+                    ...cardData,
+                    ownerId: userId,
+                },
+                include: {
+                    owner: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                        }
+                    }
+                },
+            });
+        });
 
-        // Temporary response until Card model exists
-        return createErrorResponse('Card creation not available - Card model not implemented yet', 501);
+        logAuditEvent({
+            action: 'CARD_CREATED',
+            userId: userId,
+            ip: getClientIP(req.headers),
+            userAgent: getUserAgent(req.headers),
+            resource: 'cards',
+            resourceId: card.id,
+            timestamp: new Date(),
+            details: { cardName: card.name, player: card.player },
+        });
 
-        // TODO: Uncomment when Card model is added to Prisma schema
-        // logAuditEvent({
-        //     action: 'CARD_CREATED',
-        //     userId: userId,
-        //     ip: getClientIP(req.headers),
-        //     userAgent: getUserAgent(req.headers),
-        //     resource: 'cards',
-        //     resourceId: card.id,
-        //     timestamp: new Date(),
-        //     details: { cardName: card.name, player: card.player },
-        // });
-
-        // return createSuccessResponse(card, 'Card created successfully');
+        return createSuccessResponse(card, 'Card created successfully');
 
     } catch (error) {
         console.error('Create card error:', error);

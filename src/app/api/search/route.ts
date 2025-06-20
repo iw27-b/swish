@@ -18,7 +18,6 @@ export async function GET(req: AuthenticatedRequest) {
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
         
-        // Parse complex filter objects from query string
         if (queryParams.cardFilters && typeof queryParams.cardFilters === 'string') {
             try {
                 queryParams.cardFilters = JSON.parse(queryParams.cardFilters);
@@ -64,7 +63,6 @@ export async function GET(req: AuthenticatedRequest) {
         let totalCards = 0;
         let totalUsers = 0;
 
-        // Search cards if requested
         if (type === 'all' || type === 'cards') {
             const cardSearchResults = await searchCards(
                 query, 
@@ -80,7 +78,6 @@ export async function GET(req: AuthenticatedRequest) {
             totalCards = cardSearchResults.total;
         }
 
-        // Search users if requested
         if (type === 'all' || type === 'users') {
             const userSearchResults = await searchUsers(
                 query, 
@@ -97,14 +94,11 @@ export async function GET(req: AuthenticatedRequest) {
             totalUsers = userSearchResults.total;
         }
 
-        // Calculate pagination for combined results
         const totalResults = totalCards + totalUsers;
         const totalPages = Math.ceil(totalResults / pageSize);
 
-        // Get filter suggestions based on current results
         const filterSuggestions = await getFilterSuggestions(query, cardResults, userResults);
 
-        // Generate search suggestions for typos/similar terms
         const searchSuggestions = await generateSearchSuggestions(query, cardResults, userResults);
 
         logAuditEvent({
@@ -154,6 +148,15 @@ export async function GET(req: AuthenticatedRequest) {
 
 /**
  * Search cards with fuzzy matching and filtering
+ * @param query - The search query
+ * @param filters - The filters to apply to the search
+ * @param page - The page number
+ * @param pageSize - The number of results per page
+ * @param sortBy - The field to sort by
+ * @param sortOrder - The order to sort in
+ * @param exactMatch - Whether to use exact matching
+ * @param requestingUserId - The ID of the user performing the search
+ * @returns An object containing the search results and total count
  */
 async function searchCards(
     query: string,
@@ -169,7 +172,6 @@ async function searchCards(
     const searchMode = exactMatch ? 'default' : 'insensitive';
     const searchOperator = exactMatch ? 'equals' : 'contains';
     
-    // Build where clause for fuzzy search
     const where: any = {
         OR: [
             { name: { [searchOperator]: query, mode: searchMode } },
@@ -181,7 +183,6 @@ async function searchCards(
         ]
     };
 
-    // Apply filters
     if (filters) {
         if (filters.teams?.length) {
             where.team = { in: filters.teams };
@@ -217,10 +218,8 @@ async function searchCards(
         }
     }
 
-    // Build order by clause
     let orderBy: any = {};
     if (sortBy === 'relevance') {
-        // For relevance, we'll sort by multiple factors
         orderBy = [
             { name: sortOrder },
             { createdAt: 'desc' }
@@ -254,12 +253,10 @@ async function searchCards(
         prisma.card.count({ where })
     ]);
 
-    // Calculate relevance scores and matched fields
     const results: CardSearchResult[] = cards.map(card => {
         const matchedFields: string[] = [];
         let relevanceScore = 0;
 
-        // Calculate relevance based on field matches
         const queryLower = query.toLowerCase();
         if (card.name.toLowerCase().includes(queryLower)) {
             matchedFields.push('name');
@@ -298,6 +295,16 @@ async function searchCards(
 
 /**
  * Search users with fuzzy matching and filtering
+ * @param query - The search query
+ * @param filters - The filters to apply to the search
+ * @param page - The page number
+ * @param pageSize - The number of results per page
+ * @param sortBy - The field to sort by
+ * @param sortOrder - The order to sort in
+ * @param exactMatch - Whether to use exact matching
+ * @param includeInactive - Whether to include inactive users
+ * @param requestingUserId - The ID of the user performing the search
+ * @returns An object containing the search results and total count
  */
 async function searchUsers(
     query: string,
@@ -314,7 +321,6 @@ async function searchUsers(
     const searchMode = exactMatch ? 'default' : 'insensitive';
     const searchOperator = exactMatch ? 'equals' : 'contains';
     
-    // Build where clause for fuzzy search
     const where: any = {
         OR: [
             { name: { [searchOperator]: query, mode: searchMode } },
@@ -323,12 +329,10 @@ async function searchUsers(
         ]
     };
 
-    // Exclude inactive users unless specifically requested
     if (!includeInactive) {
         where.emailVerified = true;
     }
 
-    // Apply filters
     if (filters) {
         if (filters.roles?.length) {
             where.role = { in: filters.roles };
@@ -347,7 +351,6 @@ async function searchUsers(
         }
     }
 
-    // Build order by clause
     let orderBy: any = {};
     if (sortBy === 'relevance') {
         orderBy = [
@@ -390,7 +393,6 @@ async function searchUsers(
         prisma.user.count({ where })
     ]);
 
-    // Apply follower count filters (post-query since Prisma doesn't support count filters directly)
     let filteredUsers = users;
     if (filters?.minFollowers !== undefined || filters?.maxFollowers !== undefined) {
         filteredUsers = users.filter(user => {
@@ -401,7 +403,6 @@ async function searchUsers(
         });
     }
 
-    // Calculate relevance scores and matched fields
     const results: UserSearchResult[] = filteredUsers.map(user => {
         const matchedFields: string[] = [];
         let relevanceScore = 0;
@@ -438,17 +439,19 @@ async function searchUsers(
 
 /**
  * Generate filter suggestions based on search results
+ * @param query - The search query
+ * @param cardResults - The search results for cards
+ * @param userResults - The search results for users
+ * @returns An object containing the filter suggestions
  */
 async function getFilterSuggestions(query: string, cardResults: CardSearchResult[], userResults: UserSearchResult[]) {
     const suggestions: any = {};
 
     if (cardResults.length > 0) {
-        // Get unique teams, players, brands from results
         suggestions.availableTeams = [...new Set(cardResults.map(c => c.team))].slice(0, 10);
         suggestions.availablePlayers = [...new Set(cardResults.map(c => c.player))].slice(0, 10);
         suggestions.availableBrands = [...new Set(cardResults.map(c => c.brand))].slice(0, 10);
         
-        // Get price range
         const prices = cardResults.filter(c => c.price !== null).map(c => c.price!);
         if (prices.length > 0) {
             suggestions.priceRange = {
@@ -463,13 +466,15 @@ async function getFilterSuggestions(query: string, cardResults: CardSearchResult
 
 /**
  * Generate search suggestions for typos and similar terms
+ * @param query - The search query
+ * @param cardResults - The search results for cards
+ * @param userResults - The search results for users
+ * @returns An array of search suggestions
  */
 async function generateSearchSuggestions(query: string, cardResults: CardSearchResult[], userResults: UserSearchResult[]): Promise<string[]> {
     const suggestions: string[] = [];
     
-    // If we have few results, suggest similar terms
     if (cardResults.length + userResults.length < 5) {
-        // Get popular teams, players, brands that are similar to the query
         const similarTerms = await prisma.$queryRaw<Array<{term: string, count: number}>>`
             SELECT term, count FROM (
                 SELECT team as term, COUNT(*) as count FROM "Card" 

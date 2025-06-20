@@ -3,11 +3,10 @@ import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 
 /**
- * This route is used to logout the authenticated user.
+ * Handles user logout by clearing all authentication cookies
  * @param req AuthenticatedRequest - The user object that is authenticated
- * @returns JSON response with success or error message
+ * @returns JSON response with success message and clears cookies
  */
-
 export async function POST(req: AuthenticatedRequest) {
     try {
         if (!req.user) {
@@ -16,9 +15,6 @@ export async function POST(req: AuthenticatedRequest) {
 
         const { userId } = req.user;
 
-        const authHeader = req.headers.get('authorization');
-        const token = authHeader?.split(' ')?.[1];
-
         logAuditEvent({
             action: 'USER_LOGOUT',
             userId: userId,
@@ -26,15 +22,39 @@ export async function POST(req: AuthenticatedRequest) {
             userAgent: getUserAgent(req.headers),
             resource: 'auth',
             timestamp: new Date(),
-            details: { 
-                tokenUsed: token ? `${token.substring(0, 10)}...` : 'unknown' 
-            },
         });
 
-        return createSuccessResponse(
+        const response = createSuccessResponse(
             null, 
-            'Logged out successfully. Please discard your token.'
+            'Logged out successfully'
         );
+
+        // Clear all authentication cookies
+        response.cookies.set('access_token', '', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 0,
+            path: '/'
+        });
+
+        response.cookies.set('refresh_token', '', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 0,
+            path: '/'
+        });
+
+        response.cookies.set('user_data', '', {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 0,
+            path: '/'
+        });
+
+        return response;
 
     } catch (error) {
         console.error('Logout error:', error);

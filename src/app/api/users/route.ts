@@ -58,7 +58,6 @@ export async function GET(req: AuthenticatedRequest) {
         if (search) {
             where.OR = [
                 { name: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
             ];
         }
         
@@ -84,7 +83,6 @@ export async function GET(req: AuthenticatedRequest) {
             orderBy,
             select: {
                 id: true,
-                email: true,
                 name: true,
                 role: true,
                 createdAt: true,
@@ -94,6 +92,7 @@ export async function GET(req: AuthenticatedRequest) {
                 isSeller: true,
                 sellerVerificationStatus: true,
                 languagePreference: true,
+                profileImageUrl: true,
             },
         });
 

@@ -1,44 +1,8 @@
 # Swish 🏀
 The basketball trading card platform
 
-## Features
-
-### Authentication & Security
-- **Argon2id password hashing** with complexity requirements
-- **Email verification** with secure token system
-- **Password reset** with time-limited tokens
-- **Security PIN** for additional protection
-- **Rate limiting** and audit logging
-- **International character support** (Japanese, Chinese, etc.)
-
-### User Management
-- **Extended profiles** with shipping addresses and payment methods
-- **Collections system** with sharing and collaboration
-- **Social features** - follow/unfollow users
-- **Favorites & tracking** - track cards and price changes
-- **Purchase history** with detailed transaction records
-
-### Card System
-- **Comprehensive card data** (player, team, year, brand, condition, rarity)
-- **Collection management** with public/private visibility
-- **Card favorites** and price tracking
-- **Sale/trade status** management
-
-### Search & Discovery
-- **Omni search** with fuzzy matching across cards and users
-- **Advanced filtering** by teams, players, brands, conditions, prices
-- **Real-time autocomplete** with suggestions
-- **Dynamic filter options** based on available data
-
-### API Features
-- **Standardized responses** with consistent error handling
-- **Comprehensive validation** using Zod schemas
-- **Audit logging** for security and compliance
-- **Pagination** and sorting across all endpoints
-- **Role-based access control** (USER, SELLER, ADMIN)
-
 ## Tech Stack
-- **Next.js 14** with App Router
+- **Next.js 15** with App Router
 - **TypeScript** for type safety
 - **PostgreSQL** database
 - **Prisma ORM** for database management
@@ -48,14 +12,14 @@ The basketball trading card platform
 ## Getting Started
 
 ### Prerequisites
-- Node.js 18+ and pnpm
+- Node.js 20+ and pnpm
 - PostgreSQL database
 
 ### Local Development Setup
 
 1. **Clone and install dependencies**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/iw27-b/swish
    cd swish
    pnpm install
    ```
@@ -84,51 +48,7 @@ The basketball trading card platform
 
 ## API Endpoints
 
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `POST /api/auth/forgot-password` - Password reset request
-- `POST /api/auth/reset-password` - Password reset
-- `POST /api/auth/change-password` - Change password
-
-### Users
-- `GET /api/users/me` - Current user profile
-- `PATCH /api/users/me` - Update current user
-- `GET /api/users/[userId]/profile` - Extended user profile
-- `PATCH /api/users/[userId]/profile` - Update extended profile
-- `POST /api/users/[userId]/security-pin` - Set security PIN
-
-### Collections
-- `GET /api/users/[userId]/collections` - List user collections
-- `POST /api/users/[userId]/collections` - Create collection
-- `GET /api/users/[userId]/collections/[id]` - Get collection
-- `PATCH /api/users/[userId]/collections/[id]` - Update collection
-- `DELETE /api/users/[userId]/collections/[id]` - Delete collection
-
-### Social Features
-- `GET /api/users/[userId]/followers` - Get followers
-- `POST /api/users/[userId]/followers` - Follow user
-- `DELETE /api/users/[userId]/followers` - Unfollow user
-- `GET /api/users/[userId]/favorites` - Get favorite cards
-- `POST /api/users/[userId]/favorites` - Add favorite card
-- `GET /api/users/[userId]/purchases` - Purchase history
-
-### Search
-- `GET /api/search` - Main search with filters
-- `GET /api/search/quick` - Quick search/autocomplete
-- `GET /api/search/filters` - Available filter options
-
-### Cards
-- `GET /api/cards` - List cards with filtering
-- `POST /api/cards` - Create card
-- `GET /api/cards/[id]` - Get card details
-- `PATCH /api/cards/[id]` - Update card
-- `DELETE /api/cards/[id]` - Delete card
-
-### Health
-- `GET /api/health` - API health check
-- `GET /api/health/db` - Database health check
+Please see `api.md`
 
 ## Database Schema
 

@@ -71,6 +71,10 @@ model User {
   purchases Purchase[]
   sales Purchase[] @relation("Seller")
 
+  // Trade history
+  tradesInitiated Trade[] @relation("TradeInitiator")
+  tradesReceived Trade[] @relation("TradeRecipient")
+
 }
 
 enum Role {
@@ -115,6 +119,18 @@ model Card {
   favorites   CardFavorite[]
   tracking    CardTracking[]
   purchases   Purchase[]
+  tradeCards  TradeCard[]
+
+  // Performance indexes for search and queries
+  @@index([player]) // Critical for player-based searches
+  @@index([team])   // Critical for team-based searches
+  @@index([brand])  // Critical for brand-based searches
+  @@index([ownerId]) // Critical for owner's cards queries
+  @@index([isForSale, price]) // Critical for marketplace queries
+  @@index([isForTrade]) // Critical for trade queries
+  @@index([createdAt]) // Critical for recent cards queries
+  @@index([year, brand]) // Composite index for year + brand filtering
+  @@index([player, team, year]) // Composite index for specific card searches
 }
 
 enum CardCondition {
@@ -245,6 +261,10 @@ model Purchase {
   @@index([sellerId])
   @@index([cardId])
   @@index([status])
+  @@index([createdAt]) // Critical for purchase history sorting
+  @@index([buyerId, createdAt]) // Composite index for user's purchase history
+  @@index([sellerId, createdAt]) // Composite index for user's sales history
+  @@index([status, createdAt]) // Composite index for status-based queries with sorting
 }
 
 enum PurchaseStatus {
@@ -255,4 +275,51 @@ enum PurchaseStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+}
+
+model Trade {
+  id              String      @id @default(cuid())
+  initiatorId     String
+  recipientId     String
+  initiator       User        @relation("TradeInitiator", fields: [initiatorId], references: [id])
+  recipient       User        @relation("TradeRecipient", fields: [recipientId], references: [id])
+  status          TradeStatus @default(PENDING)
+  message         String?
+  responseMessage String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  completedAt     DateTime?
+  expiresAt       DateTime?   // Trades can expire after a certain time
+  
+  // Cards involved in the trade
+  cards           TradeCard[]
+
+  @@index([initiatorId])
+  @@index([recipientId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+model TradeCard {
+  id        String   @id @default(cuid())
+  tradeId   String
+  cardId    String
+  isOffered Boolean  // true if this card is being offered, false if requested
+  trade     Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  card      Card     @relation(fields: [cardId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([tradeId, cardId])
+  @@index([tradeId])
+  @@index([cardId])
+}
+
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+  EXPIRED
 }

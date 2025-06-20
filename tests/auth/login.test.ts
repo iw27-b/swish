@@ -3,12 +3,17 @@ import { POST as loginUser } from '@/app/api/auth/login/route';
 import prisma from '@/lib/prisma';
 import { NextRequest } from 'next/server';
 import { DeepMockProxy } from 'vitest-mock-extended';
-import * as authUtils from '@/lib/auth_utils';
+import * as edgeAuthUtils from '@/lib/edge_auth_utils';
 import * as passwordUtils from '@/lib/password_utils';
 import { Role } from '@prisma/client';
 
 vi.mock('@/lib/password_utils', () => ({
     verifyPassword: vi.fn(),
+}));
+
+vi.mock('@/lib/edge_auth_utils', () => ({
+    generateEdgeToken: vi.fn(),
+    generateEdgeRefreshToken: vi.fn(),
 }));
 
 const prismaMock = prisma as unknown as DeepMockProxy<typeof prisma>;
@@ -28,19 +33,23 @@ const mockUser = {
     isSeller: false,
     sellerVerificationStatus: null,
     languagePreference: 'en',
+    resetToken: null,
+    resetTokenExpiry: null,
+    shippingAddress: null,
+    paymentMethods: [],
+    securityPin: null,
+    phoneNumber: null,
+    dateOfBirth: null,
+    profileImageUrl: null,
+    bio: null,
 };
-
-let generateTokenSpy = vi.spyOn(authUtils, 'generateToken');
 
 describe('POST /api/auth/login', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         (passwordUtils.verifyPassword as any).mockReset();
-        generateTokenSpy.mockReturnValue('mocked.jwt.token');
-    });
-
-    afterEach(() => {
-        generateTokenSpy.mockRestore();
+        (edgeAuthUtils.generateEdgeToken as any).mockResolvedValue('mocked.jwt.token');
+        (edgeAuthUtils.generateEdgeRefreshToken as any).mockResolvedValue('mocked.refresh.token');
     });
 
     it('should login a user and return a token successfully', async () => {
@@ -62,10 +71,13 @@ describe('POST /api/auth/login', () => {
         expect(response.status).toBe(200);
         expect(body.success).toBe(true);
         expect(body.message).toBe('Login successful');
-        expect(body.data.token).toBe('mocked.jwt.token');
-        expect(body.data.user).toBeDefined();
-        expect(body.data.user.email).toBe('test@example.com');
-        expect(body.data.user.password).toBeUndefined(); // Password should not be returned
+        expect(body.data.loginSuccess).toBe(true);
+        
+        // Check cookies are set
+        const cookies = response.headers.get('set-cookie');
+        expect(cookies).toContain('access_token=');
+        expect(cookies).toContain('refresh_token=');
+        expect(cookies).toContain('user_data=');
     });
 
     it('should return 401 for non-existent user', async () => {

@@ -10,4 +10,9 @@ vi.mock('@/lib/prisma', () => ({
 beforeEach(async () => {
     const prismaMock = (await import('@/lib/prisma')).default;
     mockReset(prismaMock);
+    
+    // Setup transaction mock to pass through the callback
+    (prismaMock.$transaction as any).mockImplementation(async (callback: any) => {
+        return await callback(prismaMock);
+    });
 });

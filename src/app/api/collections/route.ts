@@ -4,29 +4,20 @@ import { AuthenticatedRequest } from '@/types';
 import { CreateCollectionSchema, CreateCollectionRequestBody, CollectionQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
 
 /**
- * Get user's collections with pagination and filtering
+ * Get authenticated user's collections with pagination and filtering
  * @param req AuthenticatedRequest - The authenticated request
- * @param params - The user ID
  * @returns JSON response with collections list or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
-) {
+export async function GET(req: AuthenticatedRequest) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
-        const requestingUser = req.user;
-
-        // Users can only view their own collections unless they're admin
-        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
-            return createErrorResponse('Forbidden: You can only view your own collections', 403);
-        }
+        const { userId } = req.user;
 
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -41,6 +32,14 @@ export async function GET(
         }
 
         const { page, pageSize, search, isPublic, sortBy, sortOrder } = validationResult.data;
+
+        const ALLOWED_SORT_FIELDS = {
+            'createdAt': 'createdAt',
+            'name': 'name', 
+            'updatedAt': 'updatedAt'
+        } as const;
+
+        const safeSortBy = ALLOWED_SORT_FIELDS[sortBy as keyof typeof ALLOWED_SORT_FIELDS] || 'createdAt';
 
         const where: any = { ownerId: userId };
         
@@ -90,7 +89,7 @@ export async function GET(
                         }
                     }
                 },
-                orderBy: { [sortBy]: sortOrder },
+                orderBy: { [safeSortBy]: sortOrder },
                 skip: (page - 1) * pageSize,
                 take: pageSize,
             }),
@@ -101,12 +100,12 @@ export async function GET(
 
         logAuditEvent({
             action: 'USER_COLLECTIONS_VIEWED',
-            userId: requestingUser.userId,
+            userId: userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'collection',
             timestamp: new Date(),
-            details: { targetUserId: userId, page, pageSize }
+            details: { page, pageSize }
         });
 
         return createSuccessResponse({
@@ -128,41 +127,48 @@ export async function GET(
 }
 
 /**
- * Create a new collection for the user
+ * Create a new collection for the authenticated user
  * @param req AuthenticatedRequest - The authenticated request
- * @param params - The user ID
  * @returns JSON response with created collection or error
  */
-export async function POST(
-    req: AuthenticatedRequest,
-    { params }: { params: { userId: string } }
-) {
+export async function POST(req: AuthenticatedRequest) {
     try {
         if (!req.user) {
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = params;
-        const requestingUser = req.user;
+        const { userId } = req.user;
 
-        // Users can only create collections for themselves
-        if (requestingUser.userId !== userId) {
-            return createErrorResponse('Forbidden: You can only create collections for yourself', 403);
+        const clientIP = getClientIP(req.headers);
+
+        if (isRateLimitedForOperation(clientIP, 'collections')) {
+            logAuditEvent({
+                action: 'COLLECTION_CREATE_RATE_LIMITED',
+                userId: userId,
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'collection',
+                timestamp: new Date(),
+            });
+            return createErrorResponse('Too many collection operations. Please try again later.', 429);
         }
 
         let requestBody;
         try {
             requestBody = await req.json();
         } catch (error) {
+            recordAttemptForOperation(clientIP, 'collections');
             return createErrorResponse('Invalid JSON format in request body', 400);
         }
 
         if (!validateRequestSize(requestBody)) {
+            recordAttemptForOperation(clientIP, 'collections');
             return createErrorResponse('Request too large', 413);
         }
 
         const validationResult = CreateCollectionSchema.safeParse(requestBody);
         if (!validationResult.success) {
+            recordAttemptForOperation(clientIP, 'collections');
             return createErrorResponse(
                 'Invalid request data',
                 400,
@@ -172,39 +178,40 @@ export async function POST(
 
         const { name, description, isPublic, imageUrl } = validationResult.data as CreateCollectionRequestBody;
 
-        // Check if user already has a collection with this name
-        const existingCollection = await prisma.collection.findFirst({
-            where: {
-                ownerId: userId,
-                name: { equals: name, mode: 'insensitive' }
+        recordAttemptForOperation(clientIP, 'collections');
+
+        const collection = await prisma.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({
+                where: { id: userId },
+                select: { id: true }
+            });
+
+            if (!user) {
+                throw new Error('User not found');
             }
-        });
 
-        if (existingCollection) {
-            return createErrorResponse('A collection with this name already exists', 409);
-        }
-
-        const collection = await prisma.collection.create({
-            data: {
-                name: name.trim(),
-                description: description?.trim(),
-                isPublic: isPublic || false,
-                imageUrl,
-                ownerId: userId
-            },
-            include: {
-                _count: {
-                    select: {
-                        cards: true,
-                        sharedWith: true
+            return tx.collection.create({
+                data: {
+                    name: name.trim(),
+                    description: description?.trim(),
+                    isPublic: isPublic || false,
+                    imageUrl,
+                    ownerId: userId
+                },
+                include: {
+                    _count: {
+                        select: {
+                            cards: true,
+                            sharedWith: true
+                        }
                     }
                 }
-            }
+            });
         });
 
         logAuditEvent({
             action: 'COLLECTION_CREATED',
-            userId: requestingUser.userId,
+            userId: userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'collection',
@@ -216,6 +223,9 @@ export async function POST(
         return createSuccessResponse(collection, 'Collection created successfully');
 
     } catch (error) {
+        if (error instanceof Error && error.message === 'User not found') {
+            return createErrorResponse('User not found', 404);
+        }
         console.error('Create collection error:', error);
         return createErrorResponse('Internal server error', 500);
     }
