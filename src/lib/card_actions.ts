@@ -14,8 +14,6 @@ export interface CreateCardData {
     cardNumber: string;
     condition: 'MINT' | 'NEAR_MINT' | 'EXCELLENT' | 'VERY_GOOD' | 'GOOD' | 'FAIR' | 'POOR';
     rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'ULTRA_RARE' | 'SECRET_RARE';
-    isForSale: boolean;
-    price?: number;
     description?: string;
 }
 
@@ -62,6 +60,8 @@ export async function createCard(cardData: CreateCardData) {
             data: {
                 ...cardData,
                 ownerId: user.userId,
+                isForSale: false,
+                price: null,
             },
             include: {
                 owner: {
@@ -106,10 +106,18 @@ export async function updateCard(cardId: string, updates: Partial<CreateCardData
         }
 
         await requireOwnership(card.ownerId);
+        if ('isForSale' in updates || 'price' in updates) {
+            return { success: false, message: 'Use setCardForSale(cardId, price) to manage sale status and price' };
+        }
+        const {
+            isForSale: _dropIsForSale,
+            price: _dropPrice,
+            ...safeUpdates
+        } = updates as any;
 
         const updatedCard = await prisma.card.update({
             where: { id: cardId },
-            data: updates,
+            data: safeUpdates,
             include: {
                 owner: {
                     select: {
@@ -188,8 +196,10 @@ export async function setCardForSale(cardId: string, price: number) {
         }
 
         await requireOwnership(card.ownerId);
-
-        const user = await requireRole(Role.SELLER);
+        await requireRole(Role.SELLER);
+        if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
+            return { success: false, message: 'Price must be a positive number' };
+        }
 
         const updatedCard = await prisma.card.update({
             where: { id: cardId },

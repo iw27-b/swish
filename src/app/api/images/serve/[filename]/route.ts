@@ -28,40 +28,54 @@ export async function GET(
             return new NextResponse('Invalid filename', { status: 400 });
         }
 
-        const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-_]/g, '');
-        if (sanitizedFilename !== filename) {
+        const base = path.posix.basename(filename);
+        if (!/^[A-Za-z0-9._-]+$/.test(base)) {
             return new NextResponse('Invalid filename format', { status: 400 });
         }
-
         const originalExt = path.extname(filename).toLowerCase();
         if (!MIME_TYPES[originalExt]) {
             return new NextResponse('Unsupported file type', { status: 400 });
         }
 
-        const filePath = path.join(IMAGES_DIR, sanitizedFilename);
+        const resolvedPath = path.resolve(IMAGES_DIR, base);
+        
+        const relativePath = path.relative(IMAGES_DIR, resolvedPath);
+        if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+            return new NextResponse('Invalid file path', { status: 400 });
+        }
 
+        let stats;
         try {
-            await fs.access(filePath);
+            stats = await fs.stat(resolvedPath);
         } catch {
             return new NextResponse('Image not found', { status: 404 });
         }
 
-        const buffer = await fs.readFile(filePath);
-        const mimeType = MIME_TYPES[originalExt];
-        const etag = `"${buffer.length}-${Date.now()}"`;
+        if (!stats.isFile()) {
+            return new NextResponse('Image not found', { status: 404 });
+        }
 
+        const mimeType = MIME_TYPES[originalExt];
+        const etag = `"${stats.size}-${stats.mtimeMs}"`;
+
+        const ifNoneMatch = req.headers.get('if-none-match');
+        if (ifNoneMatch === etag) {
+            return new NextResponse(null, { 
+                status: 304,
+                headers: {
+                    'ETag': etag,
+                    'Cache-Control': 'public, max-age=31536000, immutable',
+                }
+            });
+        }
+
+        const buffer = await fs.readFile(resolvedPath);
         const headers: Record<string, string> = {
             'Content-Type': mimeType,
             'Cache-Control': 'public, max-age=31536000, immutable',
             'Content-Length': buffer.length.toString(),
             'ETag': etag,
-            'Accept-Ranges': 'bytes',
         };
-
-        const ifNoneMatch = req.headers.get('if-none-match');
-        if (ifNoneMatch === etag) {
-            return new NextResponse(null, { status: 304, headers });
-        }
 
         return new NextResponse(buffer, {
             status: 200,

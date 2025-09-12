@@ -9,7 +9,7 @@ import {
     logAuditEvent,
     handleApiError
 } from '@/lib/api_utils';
-import { ImageListQuerySchema } from '@/types/schemas/image_schemas';
+import { ImageListQuerySchema, ImageCategory } from '@/types/schemas/image_schemas';
 import { verifyAuth } from '@/lib/auth';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -125,7 +125,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-function determineCategory(filename: string): string {
+function determineCategory(filename: string): ImageCategory {
     if (filename.includes('profile_')) return 'profile';
     if (filename.includes('collection_')) return 'collection';
     if (filename.includes('card_')) return 'card';

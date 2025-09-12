@@ -1,8 +1,9 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { UpdateCardSchema, UpdateCardRequestBody } from '@/types/schemas/card_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize, retryWithBackoff, logObservabilityError } from '@/lib/api_utils';
 import { validateImageFile } from '@/lib/image_utils';
 import { verifyAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
 import { Role } from '@prisma/client';
@@ -102,8 +103,7 @@ export async function PATCH(
             recordFailedAttempt(clientIP);
             return createErrorResponse('Card ID is required', 400);
         }
-
-        let updateData: any;
+        let updateData: Partial<UpdateCardRequestBody>;
         let imageFile: File | null = null;
 
         const contentType = req.headers.get('content-type');
@@ -117,8 +117,8 @@ export async function PATCH(
                 year: formData.get('year') ? parseInt(formData.get('year') as string) : undefined,
                 brand: formData.get('brand') as string,
                 cardNumber: formData.get('cardNumber') as string,
-                condition: formData.get('condition') as string,
-                rarity: formData.get('rarity') as string,
+                condition: formData.get('condition') as any,
+                rarity: formData.get('rarity') as any,
                 description: formData.get('description') as string,
                 isForTrade: formData.get('isForTrade') === 'true',
                 isForSale: formData.get('isForSale') === 'true',
@@ -158,13 +158,27 @@ export async function PATCH(
         }
 
         if (imageFile && imageFile.size > 0) {
-            // Upload via images API instead of processing here
-            const formData = new FormData();
-            formData.append('file', imageFile);
-            formData.append('category', 'card');
-            
             try {
-                const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/upload`, {
+                const imageBuffer = Buffer.from(await imageFile.arrayBuffer());
+                const validationResult = validateImageFile(imageBuffer);
+                
+                if (!validationResult.isValid) {
+                    recordFailedAttempt(clientIP);
+                    return createErrorResponse(
+                        validationResult.error || 'Invalid image file',
+                        400
+                    );
+                }
+                
+                const formData = new FormData();
+                formData.append('file', imageFile);
+                formData.append('category', 'card');
+                
+                if (!process.env.NEXT_PUBLIC_BASE_URL) {
+                    throw new Error('NEXT_PUBLIC_BASE_URL is not configured');
+                }
+                
+                const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/images/upload`, {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -180,7 +194,7 @@ export async function PATCH(
                 const uploadResult = await uploadResponse.json();
                 updateData.imageUrl = uploadResult.data.url;
             } catch (imageError) {
-                recordFailedAttempt(clientIP);
+                // recordFailedAttempt(clientIP);
                 return createErrorResponse(
                     `Image upload failed: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`,
                     400
@@ -348,23 +362,56 @@ export async function DELETE(
                 where: { id: cardId }
             });
         });
-
+        
         if (existingCard.imageUrl) {
             try {
-                const deleteResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/delete`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': req.headers.get('Authorization') || '',
-                        'Cookie': req.headers.get('Cookie') || '',
-                    },
-                    body: JSON.stringify({ imageUrl: existingCard.imageUrl }),
-                });
-                if (!deleteResponse.ok) {
-                    console.error('Failed to delete card image via API');
-                }
+                await retryWithBackoff(async () => {
+                    const deleteResponse = await fetch(new URL('/api/images/delete', req.nextUrl || req.url), {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': req.headers.get('Authorization') || '',
+                            'Cookie': req.headers.get('Cookie') || '',
+                        },
+                        body: JSON.stringify({ imageUrl: existingCard.imageUrl }),
+                    });
+                    
+                    if (!deleteResponse.ok) {
+                        const errorText = await deleteResponse.text();
+                        throw new Error(`Image deletion failed: ${deleteResponse.status} ${deleteResponse.statusText}. ${errorText}`);
+                    }
+                    
+                    return deleteResponse;
+                }, 3, 1000);
+                
             } catch (error) {
-                console.error('Failed to delete card image during card deletion:', error);
+                logObservabilityError({
+                    operation: 'card_image_deletion',
+                    error,
+                    context: {
+                        cardId: cardId,
+                        imageUrl: existingCard.imageUrl,
+                        action: 'DELETE_CARD_CASCADE'
+                    },
+                    severity: 'high'
+                });
+                
+                return new NextResponse(JSON.stringify({
+                    success: false,
+                    message: 'Card deleted but image cleanup failed. Image may require manual cleanup.',
+                    data: {
+                        cardDeleted: true,
+                        imageDeleted: false,
+                        orphanedImageUrl: existingCard.imageUrl
+                    },
+                    meta: {
+                        timestamp: new Date().toISOString(),
+                        requestId: randomUUID(),
+                    }
+                }), {
+                    status: 207,
+                    headers: { 'Content-Type': 'application/json' }
+                });
             }
         }
 

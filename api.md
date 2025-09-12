@@ -485,16 +485,56 @@ Sets secure HttpOnly cookies for authentication.
 }
 ```
 
+### DELETE `/api/cards/[cardId]`
+**Description:** Delete a specific card and its associated image
+**Authentication:** Required (Owner or Admin only)
+
+**Parameters:**
+- `cardId` (URL parameter): Card ID
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "message": "Card deleted successfully"
+}
+```
+
+**Response (Partial Success - Card deleted but image cleanup failed):**
+```json
+{
+  "success": false,
+  "message": "Card deleted but image cleanup failed. Image may require manual cleanup.",
+  "data": {
+    "cardDeleted": true,
+    "imageDeleted": false,
+    "orphanedImageUrl": "https://example.com/image.jpg"
+  }
+}
+```
+**Status Code:** 207 (Multi-Status)
+
+**Notes:**
+- Implements retry logic with exponential backoff for image deletion
+- Logs structured error events for observability on image cleanup failures
+- Returns partial success status when card deletion succeeds but image cleanup fails
+
 ---
 
 ## Search
 
 ### GET `/api/search/quick`
 **Description:** Quick search for autocomplete suggestions
-**Authentication:** Required
+**Authentication:** Required for user searches; Optional for card/general suggestions
+
+**Security Features:**
+- Authentication required for `type=users` searches
+- Minimum query length of 3 characters for user-related searches
+- Stricter rate limits applied to user searches (auth rate limits)
+- User suggestions only returned to authenticated users
 
 **Query Parameters:**
-- `query` (string): Search term
+- `query` (string): Search term (minimum 3 characters for user searches)
 - `limit` (number, default: 10): Max suggestions
 - `type` (string): Search type ('cards', 'users', 'suggestions', 'all')
 
@@ -519,6 +559,11 @@ Sets secure HttpOnly cookies for authentication.
   "message": "Quick search completed successfully"
 }
 ```
+
+**Error Responses:**
+- `401` - Authentication required for user searches
+- `400` - Query too short for user searches (< 3 characters)
+- `429` - Rate limit exceeded
 
 ### GET `/api/search/filters`
 **Description:** Get available filter options for advanced search
@@ -765,6 +810,94 @@ Sets secure HttpOnly cookies for authentication.
   "message": "Purchase history retrieved successfully"
 }
 ```
+
+---
+
+## Image Management
+
+### POST `/api/images/upload`
+**Description:** Upload an image for cards, collections, or profile
+**Authentication:** Required
+
+**Request Body (multipart/form-data):**
+- `file` - Image file (JPEG, PNG, WebP, GIF, max 10MB)
+- `alt` - Alt text for accessibility (optional)
+- `category` - Image category (defined by ImageCategorySchema: card, profile, or collection; default: "card")
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "/api/images/serve/abc123.jpg",
+    "filename": "abc123.jpg",
+    "hash": "sha256hash",
+    "metadata": {
+      "originalFilename": "card.jpg",
+      "size": 1024000,
+      "type": "image/jpeg",
+      "alt": "Basketball card image",
+      "category": "card",
+      "uploadedAt": "2024-01-01T00:00:00.000Z"
+    }
+  },
+  "message": "Image uploaded successfully"
+}
+```
+
+### DELETE `/api/images/delete`
+**Description:** Delete one or more images with authorization checks
+**Authentication:** Required
+**Authorization:** Must be image owner OR admin role
+**Security:** Only accepts server-internal image paths (must start with `/api/images/serve/`)
+
+**Single Image Delete:**
+```json
+{
+  "imageUrl": "/api/images/serve/abc123.jpg"
+}
+```
+
+**Note:** External URLs (starting with `http`) are no longer accepted for security reasons. Only server-internal relative paths are permitted.
+
+**Bulk Image Delete:**
+```json
+{
+  "imageUrls": [
+    "/api/images/serve/abc123.jpg",
+    "/api/images/serve/def456.png"
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "deletedUrls": ["/api/images/serve/abc123.jpg"],
+    "failedUrls": [],
+    "summary": {
+      "total": 1,
+      "deleted": 1,
+      "failed": 0
+    }
+  },
+  "message": "All images deleted successfully"
+}
+```
+
+**Authorization Rules:**
+- Users can only delete images they own (card images, collection images, profile images)
+- Admin users can delete any image
+- Authorization is checked by looking up image ownership in cards, collections, and user profiles
+- Unauthorized attempts are logged and return 403 Forbidden
+
+### GET `/api/images/serve/[filename]`
+**Description:** Serve uploaded images
+**Authentication:** Not required
+
+**Response:** Image file with optimized headers
 
 ---
 

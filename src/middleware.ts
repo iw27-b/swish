@@ -1,8 +1,9 @@
 import { NextResponse, NextRequest } from 'next/server';
 import { verifyToken, verifyRefreshToken, parseTokenFromCookie } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
-import { Role } from '@prisma/client';
 import { JwtPayload } from '@/types';
+
+export const ADMIN_ROLE = 'ADMIN';
 
 const publicPaths: string[] = [
     '/api/health',
@@ -88,12 +89,12 @@ export async function middleware(req: NextRequest) {
         
         if (method === 'GET') {
             action = isSpecificUserPath ? 'read:own' : 'list:any';
-            if (decodedPayload.role === Role.ADMIN && isSpecificUserPath) action = 'read:any';
+            if (decodedPayload.role === ADMIN_ROLE && isSpecificUserPath) action = 'read:any';
         }
         if (method === 'PATCH') action = 'update:own';
         if (method === 'DELETE') action = 'delete:any';
 
-        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === Role.ADMIN) {
+        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === ADMIN_ROLE) {
             resource = 'users';
             action = 'manage:any';
         } 
@@ -148,7 +149,7 @@ export async function middleware(req: NextRequest) {
             if (action.includes(':own') && resource === 'profile') {
                 message = 'Forbidden: You can only perform this action on your own profile.';
             }
-            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== Role.ADMIN) {
+            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== ADMIN_ROLE) {
                 message = 'Forbidden: Admin access required.';
             }
             return NextResponse.json({ 

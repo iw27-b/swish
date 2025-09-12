@@ -12,6 +12,9 @@ const SECURITY_HEADERS = {
     'Expires': '0',
 } as const;
 
+const MAX_REQUEST_BYTES = parseInt(process.env.MAX_REQUEST_BYTES || '10485760');
+const ALLOW_MISSING_CONTENT_LENGTH = process.env.ALLOW_MISSING_CONTENT_LENGTH === 'true';
+
 /**
  * Sanitize string input to prevent XSS attacks
  * @param input The string to sanitize
@@ -147,6 +150,103 @@ export function validateRequestSize(body: any, maxSizeBytes: number = 100000): b
     }
 }
 
+/**
+ * Validates request content-length before parsing body
+ * @param headers Request headers
+ * @param endpoint The API endpoint being accessed
+ * @param maxBytes Maximum allowed bytes (defaults to configured MAX_REQUEST_BYTES)
+ * @returns Object with isValid flag and optional error response
+ */
+export function validateContentLength(
+    headers: Headers,
+    endpoint: string,
+    maxBytes: number = MAX_REQUEST_BYTES
+): { isValid: boolean; errorResponse?: NextResponse } {
+    const contentLengthHeader = headers.get('content-length');
+    const contentType = headers.get('content-type') || 'unknown';
+    const clientIP = getClientIP(headers);
+    
+    if (!contentLengthHeader) {
+        if (ALLOW_MISSING_CONTENT_LENGTH) {
+            logAuditEvent({
+                action: 'REQUEST_MISSING_CONTENT_LENGTH_ALLOWED',
+                details: {
+                    endpoint,
+                    contentType,
+                    clientIP,
+                    policy: 'allow_with_caution'
+                },
+                timestamp: new Date(),
+                ip: clientIP,
+                userAgent: headers.get('user-agent') || 'unknown'
+            });
+            return { isValid: true };
+        } else {
+            logAuditEvent({
+                action: 'REQUEST_MISSING_CONTENT_LENGTH_REJECTED',
+                details: {
+                    endpoint,
+                    contentType,
+                    clientIP,
+                    policy: 'reject'
+                },
+                timestamp: new Date(),
+                ip: clientIP,
+                userAgent: headers.get('user-agent') || 'unknown'
+            });
+            return {
+                isValid: false,
+                errorResponse: createErrorResponse('Content-Length header required', 400)
+            };
+        }
+    }
+    
+    const contentLength = parseInt(contentLengthHeader, 10);
+    
+    if (isNaN(contentLength) || contentLength < 0) {
+        logAuditEvent({
+            action: 'REQUEST_INVALID_CONTENT_LENGTH',
+            details: {
+                endpoint,
+                contentType,
+                clientIP,
+                declaredLength: contentLengthHeader,
+                reason: 'invalid_format'
+            },
+            timestamp: new Date(),
+            ip: clientIP,
+            userAgent: headers.get('user-agent') || 'unknown'
+        });
+        return {
+            isValid: false,
+            errorResponse: createErrorResponse('Invalid Content-Length header', 400)
+        };
+    }
+    
+    if (contentLength > maxBytes) {
+        logAuditEvent({
+            action: 'REQUEST_SIZE_EXCEEDED',
+            details: {
+                endpoint,
+                contentType,
+                clientIP,
+                declaredLength: contentLength,
+                maxAllowed: maxBytes,
+                exceededBy: contentLength - maxBytes
+            },
+            timestamp: new Date(),
+            ip: clientIP,
+            userAgent: headers.get('user-agent') || 'unknown'
+        });
+        return {
+            isValid: false,
+            errorResponse: createErrorResponse('Payload too large', 413)
+        };
+    }
+    
+    return { isValid: true };
+}
+
 export function getClientIP(headers: Headers): string {
     return (
         headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -220,4 +320,79 @@ export function handleApiError(error: unknown, context?: string): NextResponse {
     }
     
     return createErrorResponse('Internal server error', 500);
+}
+
+/**
+ * Sleep utility for retry delays
+ * @param ms Milliseconds to sleep
+ * @returns Promise that resolves after the delay
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry function with exponential backoff
+ * @param fn Function to retry
+ * @param maxAttempts Maximum number of attempts (default: 3)
+ * @param baseDelay Base delay in milliseconds (default: 1000)
+ * @returns Promise with the result of the function or throws the last error
+ */
+export async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            
+            if (attempt === maxAttempts) {
+                throw lastError;
+            }
+            
+            const delay = baseDelay * Math.pow(2, attempt - 1);
+            await sleep(delay);
+        }
+    }
+    
+    throw lastError!;
+}
+
+/**
+ * Log structured error events for observability systems
+ * @param event Error event details
+ */
+export function logObservabilityError(event: {
+    operation: string;
+    error: unknown;
+    context: Record<string, any>;
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+}): void {
+    const requestId = randomUUID();
+    const timestamp = new Date().toISOString();
+    
+    const structuredLog = {
+        level: 'error',
+        operation: event.operation,
+        requestId,
+        timestamp,
+        severity: event.severity || 'medium',
+        error: {
+            message: event.error instanceof Error ? event.error.message : String(event.error),
+            stack: event.error instanceof Error ? event.error.stack : undefined,
+            name: event.error instanceof Error ? event.error.name : 'UnknownError'
+        },
+        context: event.context,
+        tags: {
+            component: 'api',
+            environment: process.env.NODE_ENV || 'development'
+        }
+    };
+    
+    console.error('[OBSERVABILITY_ERROR]', JSON.stringify(structuredLog, null, 2));
 } 

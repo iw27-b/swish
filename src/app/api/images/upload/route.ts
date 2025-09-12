@@ -10,7 +10,7 @@ import {
     logAuditEvent,
     handleApiError
 } from '@/lib/api_utils';
-import { ImageUploadSchema } from '@/types/schemas/image_schemas';
+import { ImageUploadSchema, ImageCategorySchema } from '@/types/schemas/image_schemas';
 import { isRateLimited, recordFailedAttempt, verifyAuth } from '@/lib/auth';
 // import { config } from 'dotenv';
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const file = formData.get('file') as File;
         const alt = formData.get('alt') as string;
-        const category = formData.get('category') as string || 'card';
+        const category = formData.get('category') as string || ImageCategorySchema.parse('card');
 
         if (!file) {
             recordFailedAttempt(clientIP);

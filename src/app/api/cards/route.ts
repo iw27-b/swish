@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { CreateCardSchema, CreateCardRequestBody, CardListQuerySchema, CardListQuery } from '@/types/schemas/card_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo, validateRequestSize } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo, validateRequestSize, validateContentLength } from '@/lib/api_utils';
 import { validateImageFile } from '@/lib/image_utils';
 import { verifyAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
 
@@ -199,6 +199,12 @@ export async function POST(req: NextRequest) {
 
         const { userId } = authResult.user;
 
+        const contentLengthValidation = validateContentLength(req.headers, '/api/cards');
+        if (!contentLengthValidation.isValid) {
+            recordFailedAttempt(clientIP);
+            return contentLengthValidation.errorResponse!;
+        }
+
         let cardData: any;
         let imageFile: File | null = null;
 
@@ -231,20 +237,27 @@ export async function POST(req: NextRequest) {
         }
 
         if (imageFile && imageFile.size > 0) {
-            // Upload via images API
             const formData = new FormData();
             formData.append('file', imageFile);
             formData.append('category', 'card');
             
             try {
-                const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/upload`, {
+                const origin = new URL(req.url).origin;
+                const uploadUrl = `${origin}/api/images/upload`;
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 10_000);
+                const headers: HeadersInit = {};
+                const auth = req.headers.get('authorization');
+                if (auth) headers['authorization'] = auth;
+                const cookie = req.headers.get('cookie');
+                if (cookie) headers['cookie'] = cookie;
+                const uploadResponse = await fetch(uploadUrl, {
                     method: 'POST',
                     body: formData,
-                    headers: {
-                        'Authorization': req.headers.get('Authorization') || '',
-                        'Cookie': req.headers.get('Cookie') || '',
-                    },
+                    signal: controller.signal,
+                    headers,
                 });
+                clearTimeout(timer);
                 
                 if (!uploadResponse.ok) {
                     throw new Error('Image upload failed');

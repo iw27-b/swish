@@ -18,8 +18,8 @@ export const GET = withAuth(async (req, user) => {
                 twoFactorEnabled: true, isSeller: true, sellerVerificationStatus: true,
                 languagePreference: true, profileImageUrl: true,
                 phoneNumber: true, dateOfBirth: true, bio: true,
-                shippingAddress: true, paymentMethods: true,
-                securityPin: true // Include to check if set
+                shippingAddress: true,
+                securityPin: true
             },
         });
 
@@ -108,7 +108,7 @@ export const PATCH = withAuth(async (req, user) => {
                 twoFactorEnabled: true, isSeller: true, sellerVerificationStatus: true,
                 languagePreference: true, profileImageUrl: true,
                 phoneNumber: true, dateOfBirth: true, bio: true,
-                shippingAddress: true, paymentMethods: true,
+                shippingAddress: true,
                 securityPin: true
             },
         });
@@ -146,7 +146,7 @@ async function getUserProfile(userId: string) {
             twoFactorEnabled: true, isSeller: true, sellerVerificationStatus: true,
             languagePreference: true, profileImageUrl: true,
             phoneNumber: true, dateOfBirth: true, bio: true,
-            shippingAddress: true, paymentMethods: true,
+            shippingAddress: true,
             securityPin: true
         },
     });

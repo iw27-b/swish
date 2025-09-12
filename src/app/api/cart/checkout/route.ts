@@ -39,8 +39,11 @@ async function mockPaymentValidation(paymentMethodId: string, amount: number): P
         return { success: false, error: 'Amount exceeds limit' };
     }
 
-    if (Math.random() < 0.05) {
-        return { success: false, error: 'Payment processing failed' };
+    // Only add random failures in development/testing environments
+    if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_RANDOM_PAYMENT_FAILURES === 'true') {
+        if (Math.random() < 0.05) {
+            return { success: false, error: 'Payment processing failed (simulated)' };
+        }
     }
 
     return {

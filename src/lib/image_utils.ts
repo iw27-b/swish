@@ -1,6 +1,9 @@
 import path from 'path';
+import * as imageType from 'image-type';
 
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_UPLOAD_SIZE || '0', 10);
+const DEFAULT_MAX_FILE_SIZE = 10485760;
+const envValue = parseInt(process.env.MAX_FILE_UPLOAD_SIZE || '', 10);
+const MAX_FILE_SIZE = isNaN(envValue) ? DEFAULT_MAX_FILE_SIZE : envValue;
 
 const ALLOWED_MIME_TYPES = [
     'image/jpeg',
@@ -18,11 +21,20 @@ export interface ImageValidationResult {
 /**
  * Basic image file validation (type and size only)
  */
-export function validateImageFile(buffer: Buffer, mimeType: string): ImageValidationResult {
-    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+export function validateImageFile(buffer: Buffer): ImageValidationResult {
+    const detected = imageType.default(buffer);
+    
+    if (detected === null) {
         return {
             isValid: false,
-            error: `Unsupported file type: ${mimeType}. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
+            error: 'Unknown/unsupported file type',
+        };
+    }
+    
+    if (!ALLOWED_MIME_TYPES.includes(detected.mime)) {
+        return {
+            isValid: false,
+            error: `Unsupported file type: ${detected.mime}. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`,
         };
     }
 

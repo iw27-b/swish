@@ -23,6 +23,7 @@
     "argon2": "^0.43.0",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.5.0",
+    "image-type": "4.1.0",
     "jose": "^6.0.11",
     "jsonwebtoken": "^9.0.2",
     "next": "15.3.2",

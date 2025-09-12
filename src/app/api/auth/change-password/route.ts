@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const isCurrentPasswordValid = verifyPassword(currentPassword, dbUser.password);
+        const isCurrentPasswordValid = await verifyPassword(currentPassword, dbUser.password);
         if (!isCurrentPasswordValid) {
             logAuditEvent({
                 action: 'PASSWORD_CHANGE_INVALID_CURRENT',

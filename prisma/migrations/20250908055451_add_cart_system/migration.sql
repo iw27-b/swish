@@ -4,6 +4,21 @@
   - A unique constraint covering the columns `[tradeId,cardId]` on the table `TradeCard` will be added. If there are existing duplicate values, this will fail.
 
 */
+
+-- Remove duplicate TradeCard records before recreating unique index
+-- Keep only the most recent row per (tradeId, cardId) combination
+DELETE FROM "TradeCard" 
+WHERE id IN (
+  SELECT id FROM (
+    SELECT id, ROW_NUMBER() OVER (
+      PARTITION BY "tradeId", "cardId" 
+      ORDER BY "createdAt" DESC, id DESC
+    ) as rn
+    FROM "TradeCard"
+  ) ranked
+  WHERE rn > 1
+);
+
 -- DropIndex
 DROP INDEX "TradeCard_tradeId_cardId_key";
 

@@ -7,6 +7,27 @@ import { requirePin } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
 
+/**
+ * Sanitize payment methods to return only safe, non-sensitive fields
+ * @param paymentMethods - Raw payment methods array
+ * @returns Sanitized payment methods with safe fields only
+ */
+function sanitizePaymentMethods(paymentMethods: any[]): Array<{
+    id: string;
+    brand: string;
+    last4: string;
+    expMonth: number;
+    expYear: number;
+}> {
+    return paymentMethods.map((method, index) => ({
+        id: `${index}`,
+        brand: method.provider || method.type || 'Unknown',
+        last4: method.lastFour || '****',
+        expMonth: method.expiryMonth || 0,
+        expYear: method.expiryYear || 0
+    }));
+}
+
 const PaymentMethodSchema = z.object({
     type: z.enum(['credit_card', 'debit_card', 'paypal', 'bank_account']),
     last4: z.string().length(4, { message: 'Last 4 digits must be exactly 4 characters' }),
@@ -70,8 +91,9 @@ export async function GET(
             timestamp: new Date(),
         });
 
+        const sanitizedMethods = sanitizePaymentMethods(user.paymentMethods || []);
         return createSuccessResponse(
-            { paymentMethods: user.paymentMethods || [] }, 
+            { paymentMethods: sanitizedMethods }, 
             'Payment methods retrieved successfully'
         );
 
@@ -166,8 +188,9 @@ export async function PATCH(
             details: { methodCount: paymentMethods.length },
         });
 
+        const sanitizedMethods = sanitizePaymentMethods(updatedUser.paymentMethods || []);
         return createSuccessResponse(
-            { paymentMethods: updatedUser.paymentMethods }, 
+            { paymentMethods: sanitizedMethods }, 
             'Payment methods updated successfully'
         );
 
