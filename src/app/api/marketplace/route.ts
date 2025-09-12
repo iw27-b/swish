@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { CardListQuerySchema, CardListQuery } from '@/types/schemas/card_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Get marketplace cards (cards for sale) with advanced filtering and search

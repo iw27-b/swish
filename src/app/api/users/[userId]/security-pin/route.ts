@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '@/types';
 import { SetSecurityPinSchema, SetSecurityPinRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
-import { hashPassword } from '@/lib/password_utils';
+import { hashPassword } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**

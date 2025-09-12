@@ -21,13 +21,14 @@ export const CreateCardSchema = z.object({
         .min(1, { message: 'Card number is required' })
         .max(20, { message: 'Card number must be less than 20 characters' }),
     condition: z.enum(['POOR', 'FAIR', 'GOOD', 'VERY_GOOD', 'EXCELLENT', 'NEAR_MINT', 'MINT']),
-    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'LEGENDARY']),
+    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'SECRET_RARE', 'LEGENDARY']),
     description: z.string()
         .max(500, { message: 'Description must be less than 500 characters' })
         .optional(),
     imageUrl: z.string()
         .url({ message: 'Invalid image URL' })
         .optional(),
+    imageFile: z.any().optional(),
     isForTrade: z.boolean().default(false),
     isForSale: z.boolean().default(false),
     price: z.number()
@@ -83,13 +84,14 @@ const BaseUpdateCardSchema = z.object({
         .max(20, { message: 'Card number must be less than 20 characters' })
         .optional(),
     condition: z.enum(['POOR', 'FAIR', 'GOOD', 'VERY_GOOD', 'EXCELLENT', 'NEAR_MINT', 'MINT']).optional(),
-    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'LEGENDARY']).optional(),
+    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'SECRET_RARE', 'LEGENDARY']).optional(),
     description: z.string()
         .max(500, { message: 'Description must be less than 500 characters' })
         .optional(),
     imageUrl: z.string()
         .url({ message: 'Invalid image URL' })
         .optional(),
+    imageFile: z.any().optional(),
     isForTrade: z.boolean().optional(),
     isForSale: z.boolean().optional(),
     price: z.number()
@@ -113,7 +115,7 @@ const BaseCardListQuerySchema = z.object({
     brand: z.string().max(30).optional(),
     year: z.coerce.number().int().min(1950).max(new Date().getFullYear()).optional(),
     condition: z.enum(['POOR', 'FAIR', 'GOOD', 'VERY_GOOD', 'EXCELLENT', 'NEAR_MINT', 'MINT']).optional(),
-    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'LEGENDARY']).optional(),
+    rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'ULTRA_RARE', 'SECRET_RARE', 'LEGENDARY']).optional(),
     isForTrade: z.coerce.boolean().optional(),
     isForSale: z.coerce.boolean().optional(),
     minPrice: z.coerce.number().min(0).optional(),

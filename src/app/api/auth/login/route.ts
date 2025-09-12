@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { verifyPassword } from '@/lib/password_utils';
-import { generateEdgeToken, generateEdgeRefreshToken } from '@/lib/edge_auth_utils';
-import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { verifyPassword, generateToken, generateRefreshToken, isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth';
 import { sanitizeEmail } from '@/lib/api_utils';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
@@ -110,9 +108,8 @@ export async function POST(req: NextRequest) {
 
         clearFailedAttempts(clientIP);
 
-        // Generate tokens for secure cookie storage using Edge Runtime compatible functions
-        const accessToken = await generateEdgeToken(user.id, user.role as Role);
-        const refreshToken = await generateEdgeRefreshToken(user.id, user.role as Role);
+        const accessToken = await generateToken(user.id, user.role as Role);
+        const refreshToken = await generateRefreshToken(user.id, user.role as Role);
 
         logAuditEvent({
             action: 'LOGIN_SUCCESS',

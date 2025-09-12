@@ -1,21 +1,15 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { CardCondition, CardRarity, Role } from '@prisma/client';
 
 /**
  * Get available filter options for search
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request (public endpoint)
  * @returns JSON response with filter options or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export async function GET(req: NextRequest) {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const requestingUser = req.user;
 
         const [
             teams,
@@ -198,7 +192,6 @@ export async function GET(req: AuthenticatedRequest) {
 
         logAuditEvent({
             action: 'SEARCH_FILTERS_VIEWED',
-            userId: requestingUser.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'search',

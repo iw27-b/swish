@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { hashPassword } from '@/lib/password_utils';
-import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { hashPassword } from '@/lib/auth';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth';
 import { sanitizeEmail } from '@/lib/api_utils';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { RegisterSchema, RegisterRequestBody } from '@/types/schemas/auth_schemas';
@@ -75,7 +75,6 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Invalid email format', 400);
         }
 
-        // Use transaction for atomicity
         const user = await prisma.$transaction(async (tx) => {
             const existingUser = await tx.user.findUnique({
                 where: { email: sanitizedEmail },

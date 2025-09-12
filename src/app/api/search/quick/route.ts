@@ -1,28 +1,22 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { QuickSearchSchema, QuickSearchQuery } from '@/types/schemas/search_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Quick search API for autocomplete and real-time suggestions
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request (public endpoint)
  * @returns JSON response with quick search suggestions or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export async function GET(req: NextRequest) {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const clientIP = getClientIP(req.headers);
 
         recordAttemptForOperation(clientIP, 'search');
         if (isRateLimitedForOperation(clientIP, 'search')) {
             logAuditEvent({
                 action: 'SEARCH_RATE_LIMITED',
-                userId: req.user.userId,
                 ip: clientIP,
                 userAgent: getUserAgent(req.headers),
                 resource: 'search',
@@ -45,7 +39,6 @@ export async function GET(req: AuthenticatedRequest) {
         }
 
         const { query, limit, type } = validationResult.data as QuickSearchQuery;
-        const requestingUser = req.user;
 
         const suggestions: Array<{
             text: string;
@@ -75,7 +68,6 @@ export async function GET(req: AuthenticatedRequest) {
 
         logAuditEvent({
             action: 'QUICK_SEARCH_PERFORMED',
-            userId: requestingUser.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'search',

@@ -1,5 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyEdgeToken, parseTokenFromCookie } from '@/lib/edge_auth_utils';
+import { verifyToken, verifyRefreshToken, parseTokenFromCookie } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { JwtPayload } from '@/types';
@@ -15,11 +15,15 @@ const publicPaths: string[] = [
     '/api/auth/refresh', 
     '/api/cards', 
     '/api/marketplace', 
+    '/api/search',
+    '/api/search/quick',
+    '/api/search/filters',
 ];
 
 export async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
     const method = req.method;
+
 
     if (!path.startsWith('/api/')) {
         return NextResponse.next();
@@ -52,12 +56,12 @@ export async function middleware(req: NextRequest) {
         }, { status: 401 });
     }
 
-    const decodedPayload: JwtPayload | null = await verifyEdgeToken(accessToken);
+    const decodedPayload: JwtPayload | null = await verifyToken(accessToken);
     
     if (!decodedPayload) {
         const refreshToken = parseTokenFromCookie(req.headers.get('cookie'), 'refresh_token');
         
-        if (!refreshToken || !(await verifyEdgeToken(refreshToken))) {
+        if (!refreshToken || !(await verifyRefreshToken(refreshToken))) {
             const response = NextResponse.json({ 
                 success: false,
                 message: 'Invalid or expired token' 
@@ -113,9 +117,6 @@ export async function middleware(req: NextRequest) {
             resource = 'cards';
             action = method === 'PATCH' ? 'update:own' : 'delete:own';
         }
-    } else if (path.startsWith('/api/search')) {
-        resource = 'search';
-        action = 'read:own';
     } else if (path.startsWith('/api/trades')) {
         resource = 'trades';
         if (method === 'GET') {
@@ -133,6 +134,11 @@ export async function middleware(req: NextRequest) {
             action = 'create:own';
         } else if (method === 'PATCH') {
             action = 'update:own';
+        }
+    } else if (path.startsWith('/api/cart/checkout')) {
+        resource = 'purchases';
+        if (method === 'POST') {
+            action = 'create:own';
         }
     }
 

@@ -3,6 +3,8 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { UpdateCardSchema, UpdateCardRequestBody } from '@/types/schemas/card_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { validateImageFile } from '@/lib/image_utils';
+import { verifyAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
@@ -63,50 +65,82 @@ export async function GET(
 }
 
 /**
- * Update a specific card
- * @param req AuthenticatedRequest - The authenticated request
+ * Update a specific card with optional image upload
+ * Supports both JSON and FormData requests.
+ * @param req NextRequest - The request object (will verify auth internally)
  * @param params - The card ID
  * @returns JSON response with updated card data or error
  */
 export async function PATCH(
-    req: AuthenticatedRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ cardId: string }> }
 ) {
     try {
-        if (!req.user) {
+        const clientIP = getClientIP(req.headers);
+        
+        if (isRateLimited(clientIP)) {
+            logAuditEvent({
+                action: 'CARD_UPDATE_RATE_LIMITED',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'card',
+                timestamp: new Date(),
+            });
+            return createErrorResponse('Too many update attempts. Please try again later.', 429);
+        }
+
+        const authResult = await verifyAuth(req);
+        if (!authResult.success || !authResult.user) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Authentication required', 401);
         }
 
         const { cardId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role } = authResult.user;
 
         if (!cardId) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Card ID is required', 400);
         }
 
-        const requestBody = await req.json();
+        let updateData: any;
+        let imageFile: File | null = null;
 
-        if (!validateRequestSize(requestBody)) {
+        const contentType = req.headers.get('content-type');
+        
+        if (contentType?.includes('multipart/form-data')) {
+            const formData = await req.formData();
+            updateData = {
+                name: formData.get('name') as string,
+                player: formData.get('player') as string,
+                team: formData.get('team') as string,
+                year: formData.get('year') ? parseInt(formData.get('year') as string) : undefined,
+                brand: formData.get('brand') as string,
+                cardNumber: formData.get('cardNumber') as string,
+                condition: formData.get('condition') as string,
+                rarity: formData.get('rarity') as string,
+                description: formData.get('description') as string,
+                isForTrade: formData.get('isForTrade') === 'true',
+                isForSale: formData.get('isForSale') === 'true',
+                price: formData.get('price') ? parseFloat(formData.get('price') as string) : undefined,
+            };
+            imageFile = formData.get('file') as File;
+        } else {
+            updateData = await req.json();
+        }
+
+        if (!validateRequestSize(updateData)) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);
         }
 
-        const validationResult = UpdateCardSchema.safeParse(requestBody);
-        if (!validationResult.success) {
-            return createErrorResponse(
-                'Invalid request data',
-                400,
-                validationResult.error.flatten().fieldErrors
-            );
-        }
-
-        const updateData = validationResult.data as UpdateCardRequestBody;
-
         const existingCard = await prisma.card.findUnique({
             where: { id: cardId },
-            select: { id: true, ownerId: true, name: true }
+            select: { id: true, ownerId: true, name: true, imageUrl: true }
         });
 
         if (!existingCard) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Card not found', 404);
         }
 
@@ -114,7 +148,7 @@ export async function PATCH(
             logAuditEvent({
                 action: 'UNAUTHORIZED_CARD_UPDATE_ATTEMPT',
                 userId: userId,
-                ip: getClientIP(req.headers),
+                ip: clientIP,
                 userAgent: getUserAgent(req.headers),
                 resource: 'card',
                 resourceId: cardId,
@@ -123,14 +157,58 @@ export async function PATCH(
             return createErrorResponse('Forbidden: You can only update your own cards', 403);
         }
 
-        if (updateData.isForSale === true && updateData.price === undefined) {
+        if (imageFile && imageFile.size > 0) {
+            // Upload via images API instead of processing here
+            const formData = new FormData();
+            formData.append('file', imageFile);
+            formData.append('category', 'card');
+            
+            try {
+                const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/upload`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': req.headers.get('Authorization') || '',
+                        'Cookie': req.headers.get('Cookie') || '',
+                    },
+                });
+                
+                if (!uploadResponse.ok) {
+                    throw new Error('Image upload failed');
+                }
+                
+                const uploadResult = await uploadResponse.json();
+                updateData.imageUrl = uploadResult.data.url;
+            } catch (imageError) {
+                recordFailedAttempt(clientIP);
+                return createErrorResponse(
+                    `Image upload failed: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`,
+                    400
+                );
+            }
+        }
+
+        const validationResult = UpdateCardSchema.safeParse(updateData);
+        if (!validationResult.success) {
+            recordFailedAttempt(clientIP);
+            return createErrorResponse(
+                'Invalid request data',
+                400,
+                validationResult.error.flatten().fieldErrors
+            );
+        }
+
+        const validatedUpdateData = validationResult.data as UpdateCardRequestBody;
+
+        if (validatedUpdateData.isForSale === true && validatedUpdateData.price === undefined) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Price is required when listing card for sale', 400);
         }
 
         const updatedCard = await prisma.$transaction(async (tx) => {
             return await tx.card.update({
                 where: { id: cardId },
-                data: updateData,
+                data: validatedUpdateData,
                 include: {
                     owner: {
                         select: {
@@ -146,19 +224,22 @@ export async function PATCH(
         logAuditEvent({
             action: 'CARD_UPDATED',
             userId: userId,
-            ip: getClientIP(req.headers),
+            ip: clientIP,
             userAgent: getUserAgent(req.headers),
             resource: 'card',
             resourceId: cardId,
             timestamp: new Date(),
             details: { 
-                updatedFields: Object.keys(updateData),
+                updatedFields: Object.keys(validatedUpdateData),
                 previousName: existingCard.name,
-                newName: updatedCard.name 
+                newName: updatedCard.name,
+                hasImageUpdate: !!imageFile,
             },
         });
 
-        return createSuccessResponse(updatedCard, 'Card updated successfully');
+        const responseData = updatedCard;
+
+        return createSuccessResponse(responseData, 'Card updated successfully');
 
     } catch (error) {
         console.error('Update card error:', error);
@@ -194,6 +275,7 @@ export async function DELETE(
                 id: true, 
                 ownerId: true, 
                 name: true,
+                imageUrl: true,
                 isForSale: true,
                 isForTrade: true,
             }
@@ -266,6 +348,25 @@ export async function DELETE(
                 where: { id: cardId }
             });
         });
+
+        if (existingCard.imageUrl) {
+            try {
+                const deleteResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/images/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': req.headers.get('Authorization') || '',
+                        'Cookie': req.headers.get('Cookie') || '',
+                    },
+                    body: JSON.stringify({ imageUrl: existingCard.imageUrl }),
+                });
+                if (!deleteResponse.ok) {
+                    console.error('Failed to delete card image via API');
+                }
+            } catch (error) {
+                console.error('Failed to delete card image during card deletion:', error);
+            }
+        }
 
         logAuditEvent({
             action: 'CARD_DELETED',

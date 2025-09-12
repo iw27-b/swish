@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { ForgotPasswordSchema, ForgotPasswordRequestBody } from '@/types/schemas/user_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth';
 import { sanitizeEmail } from '@/lib/api_utils';
 import crypto from 'crypto';
 
@@ -121,7 +121,6 @@ export async function POST(req: NextRequest) {
             await sendPasswordResetEmail(user.email, resetToken);
         } catch (emailError) {
             console.error('Failed to send password reset email:', emailError);
-            // Don't reveal email sending failures to prevent information disclosure
         }
 
         clearFailedAttempts(clientIP);
