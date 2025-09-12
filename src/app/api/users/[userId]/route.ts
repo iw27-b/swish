@@ -6,7 +6,7 @@ import { VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_exte
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * This route is used to get a specific user's profile.

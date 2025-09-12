@@ -43,3 +43,6 @@ next-env.d.ts
 
 # cursor
 .cursor/
+
+# uploaded files
+/public/uploads/

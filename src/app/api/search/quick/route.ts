@@ -1,35 +1,19 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { QuickSearchSchema, QuickSearchQuery } from '@/types/schemas/search_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation, getAuthenticatedUser } from '@/lib/auth';
 
 /**
  * Quick search API for autocomplete and real-time suggestions
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request (public endpoint with conditional auth-protected features)
  * @returns JSON response with quick search suggestions or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export async function GET(req: NextRequest) {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const clientIP = getClientIP(req.headers);
-
-        recordAttemptForOperation(clientIP, 'search');
-        if (isRateLimitedForOperation(clientIP, 'search')) {
-            logAuditEvent({
-                action: 'SEARCH_RATE_LIMITED',
-                userId: req.user.userId,
-                ip: clientIP,
-                userAgent: getUserAgent(req.headers),
-                resource: 'search',
-                timestamp: new Date(),
-            });
-            return createErrorResponse('Too many search requests. Please try again later.', 429);
-        }
+        const authenticatedUser = await getAuthenticatedUser(req);
+        const isAuthenticated = !!authenticatedUser;
 
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -45,7 +29,29 @@ export async function GET(req: AuthenticatedRequest) {
         }
 
         const { query, limit, type } = validationResult.data as QuickSearchQuery;
-        const requestingUser = req.user;
+
+        if (type === 'users' && !isAuthenticated) {
+            return createErrorResponse('Authentication required for user searches', 401);
+        }
+
+        if ((type === 'users' || type === 'all') && query.length < 3) {
+            return createErrorResponse('Search query must be at least 3 characters long', 400);
+        }
+
+        const isUserSearch = type === 'users' || (type === 'all' && isAuthenticated);
+        const rateLimitOperation = isUserSearch ? 'auth' : 'search';
+        
+        recordAttemptForOperation(clientIP, rateLimitOperation);
+        if (isRateLimitedForOperation(clientIP, rateLimitOperation)) {
+            logAuditEvent({
+                action: 'SEARCH_RATE_LIMITED',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: isUserSearch ? 'user_search' : 'search',
+                timestamp: new Date(),
+            });
+            return createErrorResponse('Too many search requests. Please try again later.', 429);
+        }
 
         const suggestions: Array<{
             text: string;
@@ -59,7 +65,7 @@ export async function GET(req: AuthenticatedRequest) {
             suggestions.push(...cardSuggestions);
         }
 
-        if (type === 'all' || type === 'users') {
+        if ((type === 'all' || type === 'users') && isAuthenticated) {
             const userSuggestions = await getUserSuggestions(query, Math.floor(limit / 2));
             suggestions.push(...userSuggestions);
         }
@@ -75,15 +81,15 @@ export async function GET(req: AuthenticatedRequest) {
 
         logAuditEvent({
             action: 'QUICK_SEARCH_PERFORMED',
-            userId: requestingUser.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
-            resource: 'search',
+            resource: isUserSearch ? 'user_search' : 'search',
             timestamp: new Date(),
             details: { 
                 query, 
                 type, 
-                suggestionCount: sortedSuggestions.length 
+                suggestionCount: sortedSuggestions.length,
+                isAuthenticated 
             }
         });
 

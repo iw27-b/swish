@@ -75,6 +75,10 @@ model User {
   tradesInitiated Trade[] @relation("TradeInitiator")
   tradesReceived Trade[] @relation("TradeRecipient")
 
+  // Shopping cart
+  cart Cart?
+
+
 }
 
 enum Role {
@@ -120,6 +124,7 @@ model Card {
   tracking    CardTracking[]
   purchases   Purchase[]
   tradeCards  TradeCard[]
+  cartItems   CartItem[]
 
   // Performance indexes for search and queries
   @@index([player]) // Critical for player-based searches
@@ -148,6 +153,7 @@ enum CardRarity {
   UNCOMMON
   RARE
   ULTRA_RARE
+  SECRET_RARE
   LEGENDARY
 }
 
@@ -322,4 +328,28 @@ enum TradeStatus {
   CANCELLED
   COMPLETED
   EXPIRED
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model CartItem {
+  id       String   @id @default(cuid())
+  cartId   String
+  cardId   String
+  cart     Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  card     Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  addedAt  DateTime @default(now())
+
+  @@unique([cartId, cardId])
+  @@index([cartId])
+  @@index([cardId])
 }

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { CreatePurchaseSchema, CreatePurchaseRequestBody } from '@/types/schemas/trade_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Mock payment validation service

@@ -2,8 +2,8 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { ResetPasswordSchema, ResetPasswordRequestBody } from '@/types/schemas/user_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth_utils';
-import { hashPassword, verifyPassword } from '@/lib/password_utils';
+import { isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth';
+import { hashPassword, verifyPassword } from '@/lib/auth';
 
 /**
  * This route is used to reset the password of the user.

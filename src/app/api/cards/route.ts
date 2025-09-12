@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { CreateCardSchema, CreateCardRequestBody, CardListQuerySchema, CardListQuery } from '@/types/schemas/card_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo, validateRequestSize } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo, validateRequestSize, validateContentLength } from '@/lib/api_utils';
+import { validateImageFile } from '@/lib/image_utils';
+import { verifyAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
 
 /**
  * Handles GET requests to list basketball trading cards with advanced filtering, searching, sorting, and pagination.
@@ -169,31 +170,117 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Handles POST requests to create a new card listing.
+ * Handles POST requests to create a new card listing with optional image upload.
+ * Supports both JSON and FormData requests.
  * 
- * @param req AuthenticatedRequest - The authenticated user making the request.
+ * @param req NextRequest - The request object (will verify auth internally).
  * @returns JSON response with success or error message.
  */
-export async function POST(req: AuthenticatedRequest) {
+export async function POST(req: NextRequest) {
     try {
-        if (!req.user) {
+        const clientIP = getClientIP(req.headers);
+        
+        if (isRateLimited(clientIP)) {
+            logAuditEvent({
+                action: 'CARD_CREATION_RATE_LIMITED',
+                ip: clientIP,
+                userAgent: getUserAgent(req.headers),
+                resource: 'cards',
+                timestamp: new Date(),
+            });
+            return createErrorResponse('Too many card creation attempts. Please try again later.', 429);
+        }
+
+        const authResult = await verifyAuth(req);
+        if (!authResult.success || !authResult.user) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Authentication required', 401);
         }
 
-        const { userId } = req.user;
+        const { userId } = authResult.user;
 
-        const requestBody = await req.json();
+        const contentLengthValidation = validateContentLength(req.headers, '/api/cards');
+        if (!contentLengthValidation.isValid) {
+            recordFailedAttempt(clientIP);
+            return contentLengthValidation.errorResponse!;
+        }
 
-        if (!validateRequestSize(requestBody)) {
+        let cardData: any;
+        let imageFile: File | null = null;
+
+        const contentType = req.headers.get('content-type');
+        
+        if (contentType?.includes('multipart/form-data')) {
+            const formData = await req.formData();
+            cardData = {
+                name: formData.get('name') as string,
+                player: formData.get('player') as string,
+                team: formData.get('team') as string,
+                year: formData.get('year') ? parseInt(formData.get('year') as string) : undefined,
+                brand: formData.get('brand') as string,
+                cardNumber: formData.get('cardNumber') as string,
+                condition: formData.get('condition') as string,
+                rarity: formData.get('rarity') as string,
+                description: formData.get('description') as string,
+                isForTrade: formData.get('isForTrade') === 'true',
+                isForSale: formData.get('isForSale') === 'true',
+                price: formData.get('price') ? parseFloat(formData.get('price') as string) : undefined,
+            };
+            imageFile = formData.get('file') as File;
+        } else {
+            cardData = await req.json();
+        }
+
+        if (!validateRequestSize(cardData)) {
+            recordFailedAttempt(clientIP);
             return createErrorResponse('Request too large', 413);
         }
 
-        const validationResult = CreateCardSchema.safeParse(requestBody);
+        if (imageFile && imageFile.size > 0) {
+            const formData = new FormData();
+            formData.append('file', imageFile);
+            formData.append('category', 'card');
+            
+            try {
+                const origin = new URL(req.url).origin;
+                const uploadUrl = `${origin}/api/images/upload`;
+                const controller = new AbortController();
+                const timer = setTimeout(() => controller.abort(), 10_000);
+                const headers: HeadersInit = {};
+                const auth = req.headers.get('authorization');
+                if (auth) headers['authorization'] = auth;
+                const cookie = req.headers.get('cookie');
+                if (cookie) headers['cookie'] = cookie;
+                const uploadResponse = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal,
+                    headers,
+                });
+                clearTimeout(timer);
+                
+                if (!uploadResponse.ok) {
+                    throw new Error('Image upload failed');
+                }
+                
+                const uploadResult = await uploadResponse.json();
+                cardData.imageUrl = uploadResult.data.url;
+            } catch (imageError) {
+                recordFailedAttempt(clientIP);
+                return createErrorResponse(
+                    `Image upload failed: ${imageError instanceof Error ? imageError.message : 'Unknown error'}`,
+                    400
+                );
+            }
+        }
+
+        const validationResult = CreateCardSchema.safeParse(cardData);
         if (!validationResult.success) {
+            recordFailedAttempt(clientIP);
             logAuditEvent({
                 action: 'CARD_CREATION_VALIDATION_FAILED',
                 userId: userId,
-                ip: getClientIP(req.headers),
+                ip: clientIP,
                 userAgent: getUserAgent(req.headers),
                 resource: 'cards',
                 timestamp: new Date(),
@@ -206,12 +293,24 @@ export async function POST(req: AuthenticatedRequest) {
             );
         }
 
-        const cardData = validationResult.data as CreateCardRequestBody;
+        const validatedCardData = validationResult.data as CreateCardRequestBody;
 
         const card = await prisma.$transaction(async (tx) => {
             return await tx.card.create({
                 data: {
-                    ...cardData,
+                    name: validatedCardData.name,
+                    player: validatedCardData.player,
+                    team: validatedCardData.team,
+                    year: validatedCardData.year,
+                    brand: validatedCardData.brand,
+                    cardNumber: validatedCardData.cardNumber,
+                    condition: validatedCardData.condition,
+                    rarity: validatedCardData.rarity,
+                    description: validatedCardData.description,
+                    imageUrl: validatedCardData.imageUrl,
+                    isForTrade: validatedCardData.isForTrade,
+                    isForSale: validatedCardData.isForSale,
+                    price: validatedCardData.price,
                     ownerId: userId,
                 },
                 include: {
@@ -229,15 +328,22 @@ export async function POST(req: AuthenticatedRequest) {
         logAuditEvent({
             action: 'CARD_CREATED',
             userId: userId,
-            ip: getClientIP(req.headers),
+            ip: clientIP,
             userAgent: getUserAgent(req.headers),
             resource: 'cards',
             resourceId: card.id,
             timestamp: new Date(),
-            details: { cardName: card.name, player: card.player },
+            details: { 
+                cardName: card.name, 
+                player: card.player,
+                hasImage: !!validatedCardData.imageUrl,
+                imageProcessed: !!imageFile,
+            },
         });
 
-        return createSuccessResponse(card, 'Card created successfully');
+        const responseData = card;
+
+        return createSuccessResponse(responseData, 'Card created successfully');
 
     } catch (error) {
         console.error('Create card error:', error);

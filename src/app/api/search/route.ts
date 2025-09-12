@@ -1,19 +1,15 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { SearchQuerySchema, SearchQuery, CardSearchResult, UserSearchResult } from '@/types/schemas/search_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 
 /**
  * Comprehensive search API for cards and users with fuzzy matching and filtering
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request (public endpoint)
  * @returns JSON response with search results or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export async function GET(req: NextRequest) {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
 
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -57,7 +53,6 @@ export async function GET(req: AuthenticatedRequest) {
             includeInactive 
         } = searchParams;
 
-        const requestingUser = req.user;
         let cardResults: CardSearchResult[] = [];
         let userResults: UserSearchResult[] = [];
         let totalCards = 0;
@@ -71,8 +66,7 @@ export async function GET(req: AuthenticatedRequest) {
                 pageSize, 
                 sortBy, 
                 sortOrder, 
-                exactMatch,
-                requestingUser.userId
+                exactMatch
             );
             cardResults = cardSearchResults.results;
             totalCards = cardSearchResults.total;
@@ -87,8 +81,7 @@ export async function GET(req: AuthenticatedRequest) {
                 sortBy, 
                 sortOrder, 
                 exactMatch,
-                includeInactive,
-                requestingUser.userId
+                includeInactive
             );
             userResults = userSearchResults.results;
             totalUsers = userSearchResults.total;
@@ -103,7 +96,6 @@ export async function GET(req: AuthenticatedRequest) {
 
         logAuditEvent({
             action: 'SEARCH_PERFORMED',
-            userId: requestingUser.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'search',
@@ -155,7 +147,6 @@ export async function GET(req: AuthenticatedRequest) {
  * @param sortBy - The field to sort by
  * @param sortOrder - The order to sort in
  * @param exactMatch - Whether to use exact matching
- * @param requestingUserId - The ID of the user performing the search
  * @returns An object containing the search results and total count
  */
 async function searchCards(
@@ -165,8 +156,7 @@ async function searchCards(
     pageSize: number,
     sortBy: string,
     sortOrder: string,
-    exactMatch: boolean,
-    requestingUserId: string
+    exactMatch: boolean
 ): Promise<{ results: CardSearchResult[], total: number }> {
     
     const searchMode = exactMatch ? 'default' : 'insensitive';
@@ -303,7 +293,6 @@ async function searchCards(
  * @param sortOrder - The order to sort in
  * @param exactMatch - Whether to use exact matching
  * @param includeInactive - Whether to include inactive users
- * @param requestingUserId - The ID of the user performing the search
  * @returns An object containing the search results and total count
  */
 async function searchUsers(
@@ -314,8 +303,7 @@ async function searchUsers(
     sortBy: string,
     sortOrder: string,
     exactMatch: boolean,
-    includeInactive: boolean,
-    requestingUserId: string
+    includeInactive: boolean
 ): Promise<{ results: UserSearchResult[], total: number }> {
     
     const searchMode = exactMatch ? 'default' : 'insensitive';

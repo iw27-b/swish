@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import { verifyPassword } from '@/lib/password_utils';
+import { verifyPassword } from '@/lib/auth';
 import { createErrorResponse } from '@/lib/api_utils';
 
 /**
@@ -29,7 +29,6 @@ export async function verifyUserPin(userId: string, providedPin: string): Promis
     });
 
     if (!user?.securityPin) {
-        // Perform dummy hash operation to maintain consistent timing
         await verifyPassword('dummy_hash_to_prevent_timing_attacks', providedPin);
         return false;
     }

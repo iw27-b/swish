@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '@/types';
 import { CreateCollectionSchema, CreateCollectionRequestBody, CollectionQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Get authenticated user's collections with pagination and filtering

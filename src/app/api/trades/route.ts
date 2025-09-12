@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { CreateTradeSchema, CreateTradeRequestBody, TradeListQuerySchema, TradeListQuery } from '@/types/schemas/trade_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize, createPaginationInfo } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Get user's trades with pagination and filtering
@@ -156,7 +156,7 @@ export async function POST(req: AuthenticatedRequest) {
         try {
             requestBody = await req.json();
         } catch (error) {
-            recordAttemptForOperation(clientIP, 'collections');
+            recordAttemptForOperation(clientIP, 'trades');
             logAuditEvent({
                 action: 'TRADE_CREATION_INVALID_JSON',
                 userId: userId,

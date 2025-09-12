@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { verifyEdgeToken, generateEdgeToken, parseTokenFromCookie } from '@/lib/edge_auth_utils';
+import { verifyRefreshToken, generateToken, parseTokenFromCookie } from '@/lib/auth';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
 import prisma from '@/lib/prisma';
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
             return createErrorResponse('Refresh token required', 401);
         }
 
-        const decodedPayload = await verifyEdgeToken(refreshToken);
+        const decodedPayload = await verifyRefreshToken(refreshToken);
         if (!decodedPayload) {
             logAuditEvent({
                 action: 'TOKEN_REFRESH_INVALID',
@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
             return response;
         }
 
-        // Verify user still exists and is active
         const user = await prisma.user.findUnique({
             where: { id: decodedPayload.userId },
         });
@@ -57,8 +56,7 @@ export async function POST(req: NextRequest) {
             return response;
         }
 
-        // Generate new access token using Edge Runtime compatible function
-        const newAccessToken = await generateEdgeToken(user.id, user.role as Role);
+        const newAccessToken = await generateToken(user.id, user.role as Role);
 
         logAuditEvent({
             action: 'TOKEN_REFRESH_SUCCESS',
@@ -71,7 +69,6 @@ export async function POST(req: NextRequest) {
 
         const response = createSuccessResponse(null, 'Token refreshed successfully');
 
-        // Set new access token cookie
         response.cookies.set('access_token', newAccessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -80,7 +77,6 @@ export async function POST(req: NextRequest) {
             path: '/'
         });
 
-        // Update user data cookie
         response.cookies.set('user_data', JSON.stringify({
             id: user.id,
             name: user.name,
@@ -90,7 +86,7 @@ export async function POST(req: NextRequest) {
             httpOnly: false,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
-            maxAge: 15 * 60, // Same as access token
+            maxAge: 15 * 60,
             path: '/'
         });
 

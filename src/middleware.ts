@@ -1,8 +1,9 @@
 import { NextResponse, NextRequest } from 'next/server';
-import { verifyEdgeToken, parseTokenFromCookie } from '@/lib/edge_auth_utils';
+import { verifyToken, verifyRefreshToken, parseTokenFromCookie } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
-import { Role } from '@prisma/client';
 import { JwtPayload } from '@/types';
+
+export const ADMIN_ROLE = 'ADMIN';
 
 const publicPaths: string[] = [
     '/api/health',
@@ -15,11 +16,15 @@ const publicPaths: string[] = [
     '/api/auth/refresh', 
     '/api/cards', 
     '/api/marketplace', 
+    '/api/search',
+    '/api/search/quick',
+    '/api/search/filters',
 ];
 
 export async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
     const method = req.method;
+
 
     if (!path.startsWith('/api/')) {
         return NextResponse.next();
@@ -52,12 +57,12 @@ export async function middleware(req: NextRequest) {
         }, { status: 401 });
     }
 
-    const decodedPayload: JwtPayload | null = await verifyEdgeToken(accessToken);
+    const decodedPayload: JwtPayload | null = await verifyToken(accessToken);
     
     if (!decodedPayload) {
         const refreshToken = parseTokenFromCookie(req.headers.get('cookie'), 'refresh_token');
         
-        if (!refreshToken || !(await verifyEdgeToken(refreshToken))) {
+        if (!refreshToken || !(await verifyRefreshToken(refreshToken))) {
             const response = NextResponse.json({ 
                 success: false,
                 message: 'Invalid or expired token' 
@@ -84,12 +89,12 @@ export async function middleware(req: NextRequest) {
         
         if (method === 'GET') {
             action = isSpecificUserPath ? 'read:own' : 'list:any';
-            if (decodedPayload.role === Role.ADMIN && isSpecificUserPath) action = 'read:any';
+            if (decodedPayload.role === ADMIN_ROLE && isSpecificUserPath) action = 'read:any';
         }
         if (method === 'PATCH') action = 'update:own';
         if (method === 'DELETE') action = 'delete:any';
 
-        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === Role.ADMIN) {
+        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === ADMIN_ROLE) {
             resource = 'users';
             action = 'manage:any';
         } 
@@ -113,9 +118,6 @@ export async function middleware(req: NextRequest) {
             resource = 'cards';
             action = method === 'PATCH' ? 'update:own' : 'delete:own';
         }
-    } else if (path.startsWith('/api/search')) {
-        resource = 'search';
-        action = 'read:own';
     } else if (path.startsWith('/api/trades')) {
         resource = 'trades';
         if (method === 'GET') {
@@ -134,6 +136,11 @@ export async function middleware(req: NextRequest) {
         } else if (method === 'PATCH') {
             action = 'update:own';
         }
+    } else if (path.startsWith('/api/cart/checkout')) {
+        resource = 'purchases';
+        if (method === 'POST') {
+            action = 'create:own';
+        }
     }
 
     if (resource && action) {
@@ -142,7 +149,7 @@ export async function middleware(req: NextRequest) {
             if (action.includes(':own') && resource === 'profile') {
                 message = 'Forbidden: You can only perform this action on your own profile.';
             }
-            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== Role.ADMIN) {
+            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== ADMIN_ROLE) {
                 message = 'Forbidden: Admin access required.';
             }
             return NextResponse.json({ 

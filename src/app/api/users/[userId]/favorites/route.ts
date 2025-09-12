@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { FavoriteQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
+import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
@@ -114,9 +115,15 @@ export async function POST(
 
         const { userId } = await params;
         const requestingUser = req.user;
+        const clientIP = getClientIP(req.headers);
 
         if (requestingUser.userId !== userId) {
             return createErrorResponse('Forbidden: You can only manage your own favorites', 403);
+        }
+
+        if (isRateLimitedForOperation(clientIP, 'profile_updates')) {
+            recordAttemptForOperation(clientIP, 'profile_updates');
+            return createErrorResponse('Too many favorite requests. Please try again later.', 429);
         }
 
         let requestBody;
