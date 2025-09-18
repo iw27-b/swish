@@ -1,7 +1,12 @@
+'use client';
+
 import React from 'react';
 import Image from "next/image";
+import { UserRound } from 'lucide-react';
+import { useAuth } from '@/lib/client_auth';
 
 const Header: React.FC = () => {
+    const { user } = useAuth();
     return (
 
         // TODO: authenticate with the backend and show the user's avatar.
@@ -16,7 +21,11 @@ const Header: React.FC = () => {
                     <span className="text-black">チーム紹介</span>
                 </nav>
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-transparent border-18 border-black flex items-center justify-center">
-                    <Image src="/images/avatar.png" alt="Login" width={36} height={36} />
+                    {user ? (
+                        <Image src={user.profileImageUrl || '/images/avatar.png'} alt="You" width={36} height={36} />
+                    ) : (
+                        <UserRound className="w-6 h-6 text-white bg-black rounded-full" />
+                    )}
                 </div>
             </div>
         </header>
