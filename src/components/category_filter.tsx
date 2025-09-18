@@ -29,24 +29,15 @@ interface SelectedFilters {
     seasons: string[];
 }
 
-let cachedFilterData: CategoryFilterData | null = null;
-let cacheTimestamp: number = 0;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 async function fetchFilterData(): Promise<CategoryFilterData> {
-    if (cachedFilterData && Date.now() - cacheTimestamp < CACHE_DURATION) {
-        return cachedFilterData;
-    }
-
     try {
         const response = await fetch('/api/search/filters', {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
             },
-            next: {
-                revalidate: 300 // 5 minutes 
-            }
         });
 
         if (!response.ok) {
@@ -70,9 +61,6 @@ async function fetchFilterData(): Promise<CategoryFilterData> {
             teams: data.data?.cardFilters?.teams || [],
             brands: data.data?.cardFilters?.brands || [],
         };
-
-        cachedFilterData = filterData;
-        cacheTimestamp = Date.now();
 
         return filterData;
     } catch (error) {
@@ -108,15 +96,38 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
     const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>(initialFilters);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [cachedData, setCachedData] = useState<{
+        data: CategoryFilterData | null;
+        timestamp: number;
+    }>({ data: null, timestamp: 0 });
 
     useEffect(() => {
+        if (typeof window === 'undefined') {
+            setIsLoading(false);
+            return;
+        }
+
         const loadFilterData = async () => {
             setIsLoading(true);
             setError(null);
 
             try {
+                const now = Date.now();
+                if (cachedData.data && (now - cachedData.timestamp < CACHE_DURATION)) {
+                    setFilterData(cachedData.data);
+                    setIsLoading(false);
+                    return;
+                }
+
+                // Fetch fresh data
                 const data = await fetchFilterData();
                 setFilterData(data);
+                
+                // Update cache
+                setCachedData({
+                    data,
+                    timestamp: now
+                });
             } catch (err) {
                 setError('フィルターデータの読み込みに失敗しました');
                 console.error('Failed to load filter data:', err);
