@@ -26,6 +26,7 @@
     "image-type": "4.1.0",
     "jose": "^6.0.11",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.544.0",
     "next": "15.3.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

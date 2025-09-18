@@ -109,32 +109,37 @@ export async function GET(req: NextRequest) {
             ) follower_counts
         `;
 
+        // Helper function to convert BigInt to number
+        const toNumber = (value: any): number => {
+            return typeof value === 'bigint' ? Number(value) : value;
+        };
+
         const filterOptions = {
             // Card filters
             cardFilters: {
                 teams: teams.map(t => ({
                     value: t.team,
-                    count: t._count.team
+                    count: toNumber(t._count.team)
                 })),
                 players: players.map(p => ({
                     value: p.player,
-                    count: p._count.player
+                    count: toNumber(p._count.player)
                 })),
                 brands: brands.map(b => ({
                     value: b.brand,
-                    count: b._count.brand
+                    count: toNumber(b._count.brand)
                 })),
                 years: years.map(y => ({
                     value: y.year,
-                    count: y._count.year
+                    count: toNumber(y._count.year)
                 })),
                 conditions: Object.values(CardCondition).map(condition => ({
                     value: condition,
-                    count: conditionCounts.find(c => c.condition === condition)?._count.condition || 0
+                    count: toNumber(conditionCounts.find(c => c.condition === condition)?._count.condition || 0)
                 })),
                 rarities: Object.values(CardRarity).map(rarity => ({
                     value: rarity,
-                    count: rarityCounts.find(r => r.rarity === rarity)?._count.rarity || 0
+                    count: toNumber(rarityCounts.find(r => r.rarity === rarity)?._count.rarity || 0)
                 })),
                 priceRange: {
                     min: priceRange._min.price || 0,
@@ -146,47 +151,47 @@ export async function GET(req: NextRequest) {
             userFilters: {
                 roles: Object.values(Role).map(role => ({
                     value: role,
-                    count: roleCounts.find(r => r.role === role)?._count.role || 0
+                    count: toNumber(roleCounts.find(r => r.role === role)?._count.role || 0)
                 })),
                 emailVerified: [
                     {
                         value: true,
-                        count: emailVerifiedCounts.find(e => e.emailVerified === true)?._count.emailVerified || 0
+                        count: toNumber(emailVerifiedCounts.find(e => e.emailVerified === true)?._count.emailVerified || 0)
                     },
                     {
                         value: false,
-                        count: emailVerifiedCounts.find(e => e.emailVerified === false)?._count.emailVerified || 0
+                        count: toNumber(emailVerifiedCounts.find(e => e.emailVerified === false)?._count.emailVerified || 0)
                     }
                 ],
                 isSeller: [
                     {
                         value: true,
-                        count: sellerCounts.find(s => s.isSeller === true)?._count.isSeller || 0
+                        count: toNumber(sellerCounts.find(s => s.isSeller === true)?._count.isSeller || 0)
                     },
                     {
                         value: false,
-                        count: sellerCounts.find(s => s.isSeller === false)?._count.isSeller || 0
+                        count: toNumber(sellerCounts.find(s => s.isSeller === false)?._count.isSeller || 0)
                     }
                 ],
                 languages: languageCounts
                     .filter(l => l.languagePreference !== null)
                     .map(l => ({
                         value: l.languagePreference!,
-                        count: l._count.languagePreference
+                        count: toNumber(l._count.languagePreference)
                     })),
                 followerRange: {
-                    min: followerStats[0]?.min || 0,
-                    max: followerStats[0]?.max || 100,
-                    average: Math.round((followerStats[0]?.avg || 0) * 100) / 100
+                    min: toNumber(followerStats[0]?.min || 0),
+                    max: toNumber(followerStats[0]?.max || 100),
+                    average: Math.round((toNumber(followerStats[0]?.avg) || 0) * 100) / 100
                 }
             },
             
             statistics: {
-                totalCards: await prisma.card.count(),
-                totalUsers: await prisma.user.count({ where: { emailVerified: true } }),
-                totalCollections: await prisma.collection.count(),
-                cardsForSale: await prisma.card.count({ where: { isForSale: true } }),
-                cardsForTrade: await prisma.card.count({ where: { isForTrade: true } })
+                totalCards: toNumber(await prisma.card.count()),
+                totalUsers: toNumber(await prisma.user.count({ where: { emailVerified: true } })),
+                totalCollections: toNumber(await prisma.collection.count()),
+                cardsForSale: toNumber(await prisma.card.count({ where: { isForSale: true } })),
+                cardsForTrade: toNumber(await prisma.card.count({ where: { isForTrade: true } }))
             }
         };
 
