@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
+/**
+ * CategoryFilter
+ * Displays a filter for the category of the cards.
+ * @param {Function} onFilterChange - Function to call when the filter changes
+ * @param {Object} initialFilters - Initial filters
+ * @param {string} className - Class name to apply to the component
+ */
+
+
 interface FilterOption {
     value: string;
     count: number;
@@ -214,7 +223,10 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
                                 </span>
                             </div>
                             <span className="text-xs text-gray-400 ml-2 flex-shrink-0">
-                                ({option.count})
+                                {/* TODO: update count so that it reflects the number of cards that match the filter */}
+                                (
+                                    {option.count}
+                                )
                             </span>
                         </label>
                     ))}
