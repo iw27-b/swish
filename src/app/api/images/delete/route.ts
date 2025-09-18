@@ -12,8 +12,68 @@ import {
 import { ImageDeleteSchema, BulkImageDeleteSchema } from '@/types/schemas/image_schemas';
 import { verifyAuth } from '@/lib/auth';
 import { recordFailedAttempt } from '@/lib/auth';
+import { Role } from '@prisma/client';
+import { JwtPayload } from '@/types';
+import prisma from '@/lib/prisma';
 
 const IMAGES_DIR = path.join(process.cwd(), 'public', 'uploads', 'images');
+
+/**
+ * Verifies if a user can delete an image by checking ownership or admin role
+ * @param user The authenticated user making the request
+ * @param imageUrl The URL of the image to delete
+ * @throws Error if user is not authorized to delete the image
+ */
+async function assertCanDeleteImage(user: JwtPayload, imageUrl: string): Promise<void> {
+    if (user.role === Role.ADMIN) {
+        return;
+    }
+
+    try {
+        const [cardWithImage, collectionWithImage, userWithProfileImage] = await Promise.all([
+            prisma.card.findFirst({
+                where: { imageUrl },
+                select: { ownerId: true }
+            }),
+            prisma.collection.findFirst({
+                where: { imageUrl },
+                select: { ownerId: true }
+            }),
+            prisma.user.findFirst({
+                where: { profileImageUrl: imageUrl },
+                select: { id: true }
+            })
+        ]);
+
+        if (cardWithImage) {
+            if (cardWithImage.ownerId !== user.userId) {
+                throw new Error('Forbidden: You can only delete your own card images');
+            }
+            return;
+        }
+
+        if (collectionWithImage) {
+            if (collectionWithImage.ownerId !== user.userId) {
+                throw new Error('Forbidden: You can only delete your own collection images');
+            }
+            return;
+        }
+
+        if (userWithProfileImage) {
+            if (userWithProfileImage.id !== user.userId) {
+                throw new Error('Forbidden: You can only delete your own profile image');
+            }
+            return;
+        }
+
+        throw new Error('Forbidden: Image not found or you do not have permission to delete it');
+    } catch (error) {
+        if (error instanceof Error) {
+            throw error;
+        }
+        throw new Error('Failed to verify image ownership');
+    }
+}
 
 export async function DELETE(req: NextRequest) {
     try {
@@ -85,6 +145,28 @@ export async function DELETE(req: NextRequest) {
                     'Invalid delete data',
                     400,
                     validation.error.flatten().fieldErrors
+                );
+            }
+
+            try {
+                await assertCanDeleteImage(authResult.user, validation.data.imageUrl);
+            } catch (authError) {
+                recordFailedAttempt(clientIP);
+                logAuditEvent({
+                    action: 'UNAUTHORIZED_IMAGE_DELETE_ATTEMPT',
+                    userId: authResult.user.id,
+                    ip: clientIP,
+                    userAgent: getUserAgent(req.headers),
+                    resource: 'images',
+                    timestamp: new Date(),
+                    details: {
+                        imageUrl: validation.data.imageUrl,
+                        error: authError instanceof Error ? authError.message : 'Unknown authorization error'
+                    },
+                });
+                return createErrorResponse(
+                    authError instanceof Error ? authError.message : 'Forbidden: You do not have permission to delete this image',
+                    403
                 );
             }
 
