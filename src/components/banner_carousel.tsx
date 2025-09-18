@@ -132,7 +132,7 @@ export const BannerCarousel = ({ autoPlay = true, intervalMs = 5000, height = '4
     };
 
     return (
-        <div className={`relative w-full h-[${height}] rounded-2xl overflow-hidden mx-auto max-w-7xl`}>
+        <div className="relative w-full rounded-2xl overflow-hidden mx-auto max-w-7xl" style={{ height }}>
             <AnimatePresence initial={false} custom={direction}>
                 <motion.div
                     key={current}
