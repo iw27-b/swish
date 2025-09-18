@@ -19,6 +19,7 @@ const publicPaths: string[] = [
     '/api/search',
     '/api/search/quick',
     '/api/search/filters',
+    '/api/images/banner',
 ];
 
 export async function middleware(req: NextRequest) {
