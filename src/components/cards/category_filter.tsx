@@ -131,7 +131,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
                 // Fetch fresh data
                 const data = await fetchFilterData();
                 setFilterData(data);
-                
+
                 // Update cache
                 setCachedData({
                     data,
@@ -147,6 +147,11 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
 
         loadFilterData();
     }, []);
+
+    // Sync selectedFilters with initialFilters when initialFilters prop changes
+    useEffect(() => {
+        setSelectedFilters(initialFilters);
+    }, [initialFilters]);
 
     const handleFilterChange = (newFilters: SelectedFilters) => {
         setSelectedFilters(newFilters);

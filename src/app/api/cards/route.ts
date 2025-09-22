@@ -120,8 +120,10 @@ export async function GET(req: NextRequest) {
 
         const offset = (page - 1) * pageSize;
 
-        const orderBy: any = {};
-        orderBy[sortBy] = sortOrder;
+        const orderBy: any = [
+            { [sortBy]: sortOrder },
+            { id: 'asc' }
+        ];
 
         const total = await prisma.card?.count({ where }) || 0;
 

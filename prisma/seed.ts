@@ -1,28 +1,179 @@
 import { PrismaClient, Role, CardCondition, CardRarity, PurchaseStatus, TradeStatus } from '@prisma/client';
 import { faker } from '@faker-js/faker';
 import * as argon2 from 'argon2';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 
-const NBA_TEAMS = [
-    'Lakers', 'Warriors', 'Celtics', 'Heat', 'Bulls', 'Knicks', 'Nets', 'Sixers',
-    'Raptors', 'Bucks', 'Pacers', 'Pistons', 'Cavaliers', 'Hawks', 'Hornets',
-    'Magic', 'Wizards', 'Nuggets', 'Clippers', 'Suns', 'Kings', 'Trail Blazers',
-    'Jazz', 'Thunder', 'Timberwolves', 'Rockets', 'Mavericks', 'Spurs', 'Pelicans', 'Grizzlies'
-];
+interface CSVCard {
+    imageid: string;
+    name: string;
+    player: string;
+    team: string;
+    year: string;
+    brand: string;
+    cardNumber: string;
+    condition: string;
+    rarity: string;
+    description: string;
+    imageUrl: string;
+    price: string;
+}
 
-const CARD_BRANDS = [
-    'Topps', 'Panini', 'Upper Deck', 'Fleer', 'Donruss', 'Bowman', 'Score', 'Skybox'
-];
 
-const BASKETBALL_PLAYERS = [
-    'LeBron James', 'Kobe Bryant', 'Michael Jordan', 'Stephen Curry', 'Kevin Durant',
-    'Giannis Antetokounmpo', 'Kawhi Leonard', 'Anthony Davis', 'Luka Dončić', 'Jayson Tatum',
-    'Jimmy Butler', 'Joel Embiid', 'Nikola Jokić', 'Damian Lillard', 'Russell Westbrook',
-    'Chris Paul', 'Blake Griffin', 'Paul George', 'Kyrie Irving', 'James Harden',
-    'Zion Williamson', 'Ja Morant', 'Trae Young', 'Devin Booker', 'Donovan Mitchell',
-    'Bam Adebayo', 'Tyler Herro', 'Paolo Banchero', 'Victor Wembanyama', 'Scottie Barnes'
-];
+/**
+ * Map CSV condition values to CardCondition enum
+ */
+function mapCondition(condition: string): CardCondition {
+    const upperCondition = condition.toUpperCase();
+    
+    if (upperCondition.includes('PSA 10') || upperCondition.includes('MINT')) {
+        return CardCondition.MINT;
+    } else if (upperCondition.includes('PSA 9') || upperCondition.includes('NEAR MINT')) {
+        return CardCondition.NEAR_MINT;
+    } else if (upperCondition.includes('PSA 8') || upperCondition.includes('EXCELLENT')) {
+        return CardCondition.EXCELLENT;
+    } else if (upperCondition.includes('PSA 7') || upperCondition.includes('VERY GOOD')) {
+        return CardCondition.VERY_GOOD;
+    } else if (upperCondition.includes('PSA 6') || upperCondition.includes('GOOD')) {
+        return CardCondition.GOOD;
+    } else if (upperCondition.includes('未査定') || upperCondition.includes('UNGRADED')) {
+        return CardCondition.GOOD; // Default for ungraded
+    } else {
+        return CardCondition.GOOD; // Default fallback
+    }
+}
+
+/**
+ * Map CSV rarity values to CardRarity enum
+ */
+function mapRarity(rarity: string): CardRarity {
+    const upperRarity = rarity.toUpperCase();
+    
+    if (upperRarity.includes('LEGENDARY') || upperRarity.includes('HOLOGRAM') || upperRarity.includes('LIMITED EDITION')) {
+        return CardRarity.LEGENDARY;
+    } else if (upperRarity.includes('SECRET') || upperRarity.includes('AUTOGRAPH') || upperRarity.includes('AUTO') || upperRarity.includes('SIGNATURE')) {
+        return CardRarity.SECRET_RARE;
+    } else if (upperRarity.includes('ULTRA') || upperRarity.includes('ROOKIE') || upperRarity.includes('INSERT') || upperRarity.includes('SHORT PRINT') || upperRarity.includes('PREMIUM')) {
+        return CardRarity.ULTRA_RARE;
+    } else if (upperRarity.includes('RARE') || upperRarity.includes('PROMO') || upperRarity.includes('PARALLEL')) {
+        return CardRarity.RARE;
+    } else if (upperRarity.includes('UNCOMMON')) {
+        return CardRarity.UNCOMMON;
+    } else {
+        return CardRarity.COMMON; // Default fallback
+    }
+}
+
+/**
+ * Parse price string to number
+ */
+function parsePrice(priceStr: string): number | null {
+    if (!priceStr) return null;
+    const cleanPrice = priceStr.replace(/[US$,\s]/g, '');
+    const price = parseFloat(cleanPrice);
+    
+    return isNaN(price) ? null : price;
+}
+
+/**
+ * Parse CSV file and return card data
+ * Properly handles quoted fields and multi-line descriptions
+ */
+function parseCSVCards(): CSVCard[] {
+    try {
+        const csvPath = path.join(process.cwd(), 'src', 'CARD.csv');
+        const csvContent = fs.readFileSync(csvPath, 'utf-8');
+        
+        function parseCSV(content: string): string[][] {
+            const rows: string[][] = [];
+            const lines = content.split('\n');
+            let currentRow: string[] = [];
+            let currentField = '';
+            let inQuotes = false;
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i];
+                let j = 0;
+                
+                while (j < line.length) {
+                    const char = line[j];
+                    
+                    if (char === '"') {
+                        if (inQuotes && j + 1 < line.length && line[j + 1] === '"') {
+                            currentField += '"';
+                            j += 2;
+                        } else {
+                            inQuotes = !inQuotes;
+                            j++;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        currentRow.push(currentField.trim());
+                        currentField = '';
+                        j++;
+                    } else {
+                        currentField += char;
+                        j++;
+                    }
+                }
+                
+                if (inQuotes) {
+                    currentField += '\n';
+                } else {
+                    currentRow.push(currentField.trim());
+                    if (currentRow.some(field => field.length > 0)) {
+                        rows.push(currentRow);
+                    }
+                    currentRow = [];
+                    currentField = '';
+                }
+                
+                i++;
+            }
+            
+            if (currentRow.length > 0 || currentField.length > 0) {
+                currentRow.push(currentField.trim());
+                if (currentRow.some(field => field.length > 0)) {
+                    rows.push(currentRow);
+                }
+            }
+            
+            return rows;
+        }
+        
+        const rows = parseCSV(csvContent);
+        const cards: CSVCard[] = [];
+        
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            
+            if (row.length >= 12) {
+                cards.push({
+                    imageid: row[0]?.trim() || '',
+                    name: row[1]?.trim() || '',
+                    player: row[2]?.trim() || '',
+                    team: row[3]?.trim() || '',
+                    year: row[4]?.trim() || '',
+                    brand: row[5]?.trim() || '',
+                    cardNumber: row[6]?.trim() || '',
+                    condition: row[7]?.trim() || '',
+                    rarity: row[8]?.trim() || '',
+                    description: row[9]?.trim() || '',
+                    imageUrl: row[10]?.trim() || '',
+                    price: row[11]?.trim() || ''
+                });
+            }
+        }
+        
+        console.log(`📄 Parsed ${cards.length} cards from CSV`);
+        return cards;
+    } catch (error) {
+        console.error('Error parsing CSV:', error);
+        return [];
+    }
+}
 
 /**
  * Generate a realistic password hash
@@ -120,39 +271,40 @@ async function generateUsers(count: number) {
 }
 
 /**
- * Generate fake card data
- * @param count - number of cards to create
+ * Generate card data from CSV file only
  * @param userIds - array of user IDs to assign as owners
- * @returns array of card creation data
+ * @returns array of card creation data from CSV
  */
-function generateCards(count: number, userIds: string[]) {
+function generateCardsFromCSV(userIds: string[]) {
+    const csvCards = parseCSVCards();
     const cards = [];
 
-    for (let i = 0; i < count; i++) {
-        const player = faker.helpers.arrayElement(BASKETBALL_PLAYERS);
-        const team = faker.helpers.arrayElement(NBA_TEAMS);
-        const brand = faker.helpers.arrayElement(CARD_BRANDS);
-        const year = faker.number.int({ min: 1980, max: 2024 });
-        const cardNumber = faker.number.int({ min: 1, max: 500 }).toString();
-        const condition = faker.helpers.enumValue(CardCondition);
-        const rarity = faker.helpers.enumValue(CardRarity);
-        const isForSale = faker.datatype.boolean(0.4);
-        const isForTrade = faker.datatype.boolean(0.3);
+    for (const csvCard of csvCards) {
+        const year = parseInt(csvCard.year) || 2023;
+        const price = parsePrice(csvCard.price);
+        const isForSale = price !== null && price > 0;
+        const isForTrade = faker.datatype.boolean(0.6); // 60% chance for trade
+        
+        // Map image to local file
+        const imageExtension = csvCard.imageid === '1' || csvCard.imageid === '2' || csvCard.imageid === '3' || 
+                              csvCard.imageid === '4' || csvCard.imageid === '6' || csvCard.imageid === '7' || 
+                              csvCard.imageid === '8' || csvCard.imageid === '9' ? 'png' : 'webp';
+        const localImageUrl = `/images/cards/${csvCard.imageid}.${imageExtension}`;
 
         cards.push({
-            name: `${year} ${brand} ${player}`,
-            player,
-            team,
+            name: csvCard.name,
+            player: csvCard.player,
+            team: csvCard.team,
             year,
-            brand,
-            cardNumber,
-            condition,
-            rarity,
-            description: faker.datatype.boolean(0.7) ? faker.lorem.sentences({ min: 1, max: 3 }) : null,
-            imageUrl: faker.datatype.boolean(0.8) ? faker.image.url({ width: 400, height: 600 }) : null,
+            brand: csvCard.brand,
+            cardNumber: csvCard.cardNumber || csvCard.imageid,
+            condition: mapCondition(csvCard.condition),
+            rarity: mapRarity(csvCard.rarity),
+            description: csvCard.description || null,
+            imageUrl: localImageUrl,
             isForTrade,
             isForSale,
-            price: isForSale ? faker.number.float({ min: 5, max: 5000, fractionDigits: 2 }) : null,
+            price: isForSale ? price : null,
             ownerId: faker.helpers.arrayElement(userIds)
         });
     }
@@ -220,16 +372,17 @@ async function main() {
 
     const userIds = users.map(u => u.id);
 
-    // Create cards
-    console.log('🃏 Creating cards...');
-    const cardData = generateCards(200, userIds);
+    // Create cards from CSV data only
+    console.log('🃏 Creating cards from CSV data...');
+    const cardData = generateCardsFromCSV(userIds);
     const cards = await prisma.card.createMany({ data: cardData });
     const allCards = await prisma.card.findMany();
-    console.log(`✅ Created ${allCards.length} cards`);
+    console.log(`✅ Created ${allCards.length} cards from CSV data`);
 
-    // Create collections
+    // Create collections  
     console.log('📚 Creating collections...');
-    const collectionData = generateCollections(30, userIds);
+    // Create fewer collections since we have fewer cards
+    const collectionData = generateCollections(15, userIds);
     const collections = [];
     for (const collection of collectionData) {
         const createdCollection = await prisma.collection.create({ data: collection });
@@ -266,7 +419,8 @@ async function main() {
     // Create user follows
     console.log('👥 Creating user follows...');
     const follows = [];
-    for (let i = 0; i < 100; i++) {
+    // Create fewer follows to match the smaller dataset
+    for (let i = 0; i < 40; i++) {
         const follower = faker.helpers.arrayElement(users);
         const following = faker.helpers.arrayElement(users.filter(u => u.id !== follower.id));
 
@@ -287,7 +441,9 @@ async function main() {
     // Create card favorites
     console.log('❤️ Creating card favorites...');
     let favoritesCount = 0;
-    for (let i = 0; i < 150; i++) {
+    // Create fewer favorites since we have fewer cards
+    const favoriteAttempts = Math.min(50, allCards.length * 2);
+    for (let i = 0; i < favoriteAttempts; i++) {
         const user = faker.helpers.arrayElement(users);
         const card = faker.helpers.arrayElement(allCards);
 
@@ -308,7 +464,9 @@ async function main() {
     // Create card tracking
     console.log('👀 Creating card tracking...');
     let trackingCount = 0;
-    for (let i = 0; i < 80; i++) {
+    // Create fewer tracking entries since we have fewer cards
+    const trackingAttempts = Math.min(30, allCards.length);
+    for (let i = 0; i < trackingAttempts; i++) {
         const user = faker.helpers.arrayElement(users);
         const card = faker.helpers.arrayElement(allCards.filter(c => c.isForSale));
 
@@ -336,7 +494,9 @@ async function main() {
     const purchasesData = [];
     const sellableCards = allCards.filter(card => card.isForSale && card.price);
 
-    for (let i = 0; i < 50; i++) {
+    // Create fewer purchases since we have fewer cards
+    const purchaseCount = Math.min(15, sellableCards.length);
+    for (let i = 0; i < purchaseCount; i++) {
         const card = faker.helpers.arrayElement(sellableCards);
         const buyer = faker.helpers.arrayElement(users.filter(u => u.id !== card.ownerId));
         const seller = users.find(u => u.id === card.ownerId);
@@ -371,7 +531,9 @@ async function main() {
     const tradesData = [];
     const tradableCards = allCards.filter(card => card.isForTrade);
 
-    for (let i = 0; i < 30; i++) {
+    // Create fewer trades since we have fewer cards
+    const tradeCount = Math.min(10, Math.floor(tradableCards.length / 2));
+    for (let i = 0; i < tradeCount; i++) {
         const initiator = faker.helpers.arrayElement(users);
         const recipient = faker.helpers.arrayElement(users.filter(u => u.id !== initiator.id));
 
@@ -452,7 +614,7 @@ async function main() {
     console.log('\n🎉 Database seeding completed successfully!');
     console.log('\n📊 Summary:');
     console.log(`👥 Users: ${users.length}`);
-    console.log(`🃏 Cards: ${allCards.length}`);
+    console.log(`🃏 Cards: ${allCards.length} (all from CSV data)`);
     console.log(`📚 Collections: ${collections.length}`);
     console.log(`🔗 Collection Cards: ${collectionCardsCount}`);
     console.log(`👥 User Follows: ${follows.length}`);
@@ -463,6 +625,7 @@ async function main() {
     console.log(`🤝 Collection Shares: ${sharesCount}`);
     console.log('\n🔑 Admin login: admin@swish.com / admin123');
     console.log('🔑 User password: password123 (for all other users)');
+    console.log('\n📷 Card images: Using local images from /public/images/cards/');
 }
 
 main()
