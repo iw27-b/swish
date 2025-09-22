@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { Heart } from 'lucide-react';
 
 interface ProductItem {
     id: number;
@@ -40,18 +41,17 @@ const CardGrid: React.FC<CardGridProps> = ({ products }) => {
                             }`}
                         onClick={() => toggleLike(product.id)}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="w-[18px] h-[18px] transition-all duration-300">
-                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41 0.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-                        </svg>
+                        <Heart className="w-[18px] h-[18px] transition-all duration-300" />
                     </div>
-                    <a href={product.href || '#'} className="no-underline text-inherit block group">
+                    <a href={product.href || '#'} className="no-underline text-inherit block">
                         <section className="w-full aspect-square rounded-2xl flex justify-center items-center bg-[#f7f7f7] p-4">
-                            <div className="w-full h-full relative">
+                            <div className="relative w-[85%] h-[85%]">
                                 <Image
                                     src={product.image}
                                     alt={product.title}
                                     fill
-                                    className="object-contain rounded-lg transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_4px_8px_rgba(0,0,0,0.4)]"
+                                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    className="object-contain rounded-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_8px_rgba(0,0,0,0.4)] cursor-pointer"
                                 />
                             </div>
                         </section>
