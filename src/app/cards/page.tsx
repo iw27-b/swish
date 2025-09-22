@@ -277,4 +277,4 @@ const CardsPage: React.FC = () => {
     );
 };
 
-            export default CardsPage;
+export default CardsPage;
