@@ -34,7 +34,6 @@ const CardsToolbar: React.FC<CardsToolbarProps> = ({
         setViewMode(mode);
         onViewModeChange?.(mode);
 
-        // TODO: figure out why this is broken and make it less hacky.
         const button = document.querySelector(`button[data-mode="${mode}"]`);
         if (button) {
             button.classList.add('font-bold');
