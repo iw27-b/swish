@@ -385,6 +385,23 @@ Sets secure HttpOnly cookies for authentication.
 
 ## Basketball Cards
 
+### Cards Listing Page: `/cards`
+**Description:** Frontend page that displays basketball trading cards with advanced filtering and search capabilities. Integrates CategoryFilter component for dynamic filtering and CardGrid component for card display.
+
+**Features:**
+- **Real-time Filtering:** Filter by players, seasons/years, and organizations
+- **Pagination:** Navigate through multiple pages of cards
+- **Responsive Grid Layout:** Card display with hover effects and like functionality
+- **Search Integration:** Connected to `/api/cards` endpoint with query parameters
+- **Loading States:** Proper loading indicators and error handling
+- **Card Details:** Click-through to individual card pages
+
+**Filter Mapping:**
+- Players filter → `player` query parameter
+- Seasons filter → `year` query parameter  
+- Organizations filter → Custom organization-based filtering
+- Pagination → `page` and `pageSize` query parameters
+
 ### GET `/api/cards`
 **Description:** List basketball trading cards with filtering and pagination
 

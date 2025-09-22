@@ -13,7 +13,7 @@ const Header: React.FC = () => {
         <header className="px-5 sm:px-10 py-6">
             <div className="max-w-7xl mx-auto flex items-center justify-between">
                 <div className="text-black font-bold text-2xl sm:text-4xl uppercase tracking-wide">
-                    SWISH
+                    <a href="/">SWISH</a>
                 </div>
                 <nav className="hidden sm:flex items-center gap-2 text-sm uppercase font-medium">
                     <span className="text-black">最新情報</span>
