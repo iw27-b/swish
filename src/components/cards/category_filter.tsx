@@ -146,9 +146,9 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
         };
 
         loadFilterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Sync selectedFilters with initialFilters when initialFilters prop changes
     useEffect(() => {
         setSelectedFilters(initialFilters);
     }, [initialFilters]);
