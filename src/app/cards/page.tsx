@@ -225,9 +225,66 @@ const CardsPage: React.FC = () => {
                     </div>
                 </form>
             </div>
-            <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <BannerCarousel height="300px" autoPlay={true} intervalMs={4000} />
-            </div>
+                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <BannerCarousel height="300px" autoPlay={true} intervalMs={4000} />
+                </div>
+
+                {/* おすすめのアイテムセクション */}
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10">
+                        <h2 className="text-3xl font-bold mb-6">おすすめのアイテム</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+                            {[
+                                {
+                                    img: '/images/cards/osusume-1.png',
+                                    title: 'NBA Star-Cards',
+                                    desc: '1991 フリーア #29 マイケル・ジョーダン・ ブルズ HOF PSA 10',
+                                    price: 'US $240.44',
+                                },
+                                {
+                                    img: '/images/cards/osusume-2.png',
+                                    title: 'NBA Star-Cards',
+                                    desc: 'Stephen Curry 2024 Topps Now Olympic Games #27 Graded Gem Mint 10',
+                                    price: 'US $34.99',
+                                },
+                                {
+                                    img: '/images/cards/osusume-3.png',
+                                    title: 'NBA Star-Cards',
+                                    desc: '2019-20 Panini Prizm Kevin Durant #210 PSA 8',
+                                    price: 'US $240.44',
+                                },
+                                {
+                                    img: '/images/cards/osusume-4.png',
+                                    title: 'NBA Star-Cards',
+                                    desc: '2023-24 Panini Prizm Prizms White #199\nYao Ming/175 - FB',
+                                    price: 'US $30.00',
+                                },
+                            ].map((card, i) => (
+                                <div key={i} className="flex flex-col items-center">
+                                    <div className="relative w-full bg-gray-100 rounded-[32px] py-6 px-6 flex flex-col items-center">
+                                        <button
+                                            className="absolute top-5 right-5 w-10 h-10 bg-white rounded-full flex items-center justify-center"
+                                            aria-label="like"
+                                        >
+                                            <Image src="/images/Vector.svg" alt="like" width={20} height={20} className="w-5 h-5" />
+                                        </button>
+                                        <Image
+                                            src={card.img}
+                                            alt={card.desc}
+                                            width={300}
+                                            height={192}
+                                            className="w-full h-48 object-contain"
+                                            style={{ borderRadius: 16 }}
+                                        />
+                                    </div>
+                                    <div className="w-full text-left mt-3">
+                                        <div className="text-gray-400 text-xs mb-1">{card.title}</div>
+                                        <div className="text-black text-sm font-normal mb-2 whitespace-pre-line">{card.desc}</div>
+                                        <div className="text-black text-xl font-bold">{card.price}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        </div>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
                 <div className="flex gap-8">
                     <div className="w-64 flex-shrink-0">
