@@ -10,9 +10,11 @@ const HomeFeaturedCardsSection: React.FC = () => {
                     {/* Left Card */}
                     <div className="bg-gray-100 rounded-2xl sm:rounded-3xl overflow-hidden flex self-start mt-12 sm:mt-16 lg:mt-24">
                         <div className="relative flex-1 pl-1 pr-0 pt-1 pb-1">
-                            <img
+                            <Image
                                 src="/images/Mask group-1.png"
                                 alt="Background"
+                                width={400}
+                                height={300}
                                 className="block w-full h-auto rounded-2xl sm:rounded-3xl"
                             />
                             <div className="pointer-events-none absolute top-1 bottom-1 left-1 right-0 flex items-center justify-center">

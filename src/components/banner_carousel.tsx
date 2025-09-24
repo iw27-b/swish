@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef } from 'react';
 import Image from 'next/image';
@@ -39,7 +39,6 @@ export const BannerCarousel = ({ autoPlay = true, intervalMs = 5000, height = '4
         const loadDimensions = async () => {
             const loadImage = (src: string) => {
                 return new Promise<{ src: string; isPortrait: boolean }>((resolve) => {
-                    // @ts-ignore
                     const img = new window.Image();
                     img.onload = () => resolve({ src, isPortrait: img.naturalHeight > img.naturalWidth });
                     img.src = src;
@@ -72,13 +71,13 @@ export const BannerCarousel = ({ autoPlay = true, intervalMs = 5000, height = '4
         if (images.length > 0) loadDimensions();
     }, [images]);
 
-    const startAutoScroll = () => {
+    const startAutoScroll = useCallback(() => {
         stopAutoScroll();
         intervalRef.current = setInterval(() => {
             setDirection(1);
             setCurrent((prev) => (prev + 1) % slides.length);
         }, intervalMs);
-    };
+    }, [slides.length, intervalMs]);
 
     const stopAutoScroll = () => {
         if (intervalRef.current) {
@@ -103,7 +102,7 @@ export const BannerCarousel = ({ autoPlay = true, intervalMs = 5000, height = '4
             stopAutoScroll();
             if (resumeRef.current) clearTimeout(resumeRef.current);
         };
-    }, [slides, autoPlay, intervalMs]);
+    }, [slides, autoPlay, intervalMs, startAutoScroll]);
 
     if (slides.length === 0) return null;
 
