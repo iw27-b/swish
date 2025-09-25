@@ -15,7 +15,7 @@ const Header: React.FC = () => {
         { label: 'ホーム', href: '/' },
         { label: 'カタログ', href: '/cards' },
         { label: '最新情報', href: '/news' },
-        { label: 'チーム紹介', href: '/#teams' }
+        { label: 'チーム紹介', href: '/team' }
     ]), []);
 
     const itemRefs = React.useRef<Array<HTMLAnchorElement | null>>([]);
