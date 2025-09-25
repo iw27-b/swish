@@ -2,10 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import $ from "jquery";
-import "./style.css"; // 确保 style.css 在同目录下
+import "./style.css"; 
 
 interface CardPageProps {
-  params: { cardId: string }; // ✅ 跟文件夹 [cardId] 保持一致
+  params: { cardId: string }; 
 }
 
 interface Card {
