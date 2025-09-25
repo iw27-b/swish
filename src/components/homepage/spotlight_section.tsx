@@ -1,12 +1,13 @@
 import React from 'react';
 import Image from "next/image";
+import { ShoppingBag } from "lucide-react";
 import styles from '../../styles/HomeSection.module.css';
 
 const HomeSpotlightSection: React.FC = () => {
     return (
         <section className={styles.spotlight}>
             <div className="absolute top-8 left-1/2 transform -translate-x-1/2">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-orange-400 flex items-center justify-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 flex items-center justify-center">
                     <span className="text-2xl">🏀</span>
                 </div>
             </div>
@@ -46,7 +47,7 @@ const HomeSpotlightSection: React.FC = () => {
                         </div>
                     </div>
                     <button className="bg-black text-white px-6 py-3 rounded-full flex items-center gap-2 mx-auto">
-                        <Image src="/images/box.png" alt="Box" width={24} height={24} className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <ShoppingBag className="w-3 h-3 sm:w-4 sm:h-4" />
                         <span className="text-sm font-medium uppercase">最も内容をチェック</span>
                     </button>
                 </div>

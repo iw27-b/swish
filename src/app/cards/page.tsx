@@ -7,7 +7,7 @@ import CardGrid from '@/components/cards/card_grid';
 import CardsToolbar from '@/components/cards/cards_toolbar';
 import { BannerCarousel } from '@/components/banner_carousel';
 import Pagination from '@/components/cards/pagination';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, Heart } from 'lucide-react';
 
 interface Card {
     id: string;
@@ -204,7 +204,7 @@ const CardsPage: React.FC = () => {
                     <div className="flex w-full">
                         <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2">
-                                <Image src="/images/icons8-search 1.svg" alt="search" width={20} height={20} />
+                                <Search className="w-5 h-5 text-black" />
                             </span>
                             <input
                                 type="text"
@@ -265,7 +265,7 @@ const CardsPage: React.FC = () => {
                                             className="absolute top-5 right-5 w-10 h-10 bg-white rounded-full flex items-center justify-center"
                                             aria-label="like"
                                         >
-                                            <Image src="/images/Vector.svg" alt="like" width={20} height={20} className="w-5 h-5" />
+                                            <Heart className="w-5 h-5 text-black" />
                                         </button>
                                         <Image
                                             src={card.img}
