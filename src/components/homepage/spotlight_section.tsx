@@ -1,6 +1,7 @@
 import React from 'react';
 import Image from "next/image";
 import styles from '../../styles/HomeSection.module.css';
+import { ArrowRight } from 'lucide-react';
 
 const HomeSpotlightSection: React.FC = () => {
     return (
@@ -46,8 +47,8 @@ const HomeSpotlightSection: React.FC = () => {
                         </div>
                     </div>
                     <button className="bg-black text-white px-6 py-3 rounded-full flex items-center gap-2 mx-auto">
-                        <Image src="/images/box.png" alt="Box" width={24} height={24} className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="text-sm font-medium uppercase">最も内容をチェック</span>
+                        <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="text-sm font-bold uppercase">最も内容をチェック</span>
                     </button>
                 </div>
             </div>
