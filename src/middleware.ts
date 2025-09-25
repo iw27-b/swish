@@ -88,10 +88,17 @@ export async function middleware(req: NextRequest) {
     if (path.startsWith('/api/users')) {
         resource = 'profile';
         const isSpecificUserPath = path.split('/').length > 3;
+        const isMeEndpoint = path === '/api/users/me';
         
         if (method === 'GET') {
-            action = isSpecificUserPath ? 'read:own' : 'list:any';
-            if (decodedPayload.role === ADMIN_ROLE && isSpecificUserPath) action = 'read:any';
+            if (isMeEndpoint) {
+                action = 'read:own'; // /api/users/me should always be allowed for authenticated users
+            } else if (isSpecificUserPath) {
+                action = 'read:own';
+                if (decodedPayload.role === ADMIN_ROLE) action = 'read:any';
+            } else {
+                action = 'list:any';
+            }
         }
         if (method === 'PATCH') action = 'update:own';
         if (method === 'DELETE') action = 'delete:any';
