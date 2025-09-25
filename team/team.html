@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Team</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    /* 顶部导航栏 */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #fff;          /* 白色背景 */
+      padding: 10px 30px;
+      color: #333;               /* 深色文字 */
+    }
+    /* 左边LOGO（图片样式） */
+    .logo img {
+      height: 40px;              /* LOGO 高度，按需要调整 */
+    }
+    /* 中间导航 */
+    nav {
+      flex: 1;
+      text-align: center;
+    }
+    nav a {
+      color: #333;
+      text-decoration: none;
+      margin: 0 20px;
+      font-weight: 500;
+    }
+ /* 给每个按钮后面加分隔符 | */
+    nav a::after {
+      content: "|";
+      margin-left: 10px;
+      color: #aaa;
+    }
+    nav a:last-child::after {
+      content: "";  /* 最后一个不要 | */
+    }
+    nav a:hover {
+      color: #7b3cff;            /* 鼠标悬停时高亮 */
+    }
+    /* 右边购物车+用户 */
+.icons {
+  display: flex;
+  gap: 18px;              /* 间距稍大一点 */
+  align-items: center;
+}
+
+.icon {
+  width: 26px;            /* 图标容器稍微放大 */
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon img {
+  max-height: 100%;       /* 图标不会变形 */
+  width: auto;
+  display: block;
+}
+/*图片的css/
+
+.gallery-seven{ max-width:1100px; margin:28px auto; padding:0 16px; }
+
+/* 顶部两张：纵向堆叠、居中 */
+.seven-layout{ max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+
+/* 顶部两张上下堆叠 */
+.top-stack{
+  display:flex; flex-direction:column; align-items:center;
+  gap:6px; margin-bottom:18px;
+}
+.top-img{ display:block; height:auto; border-radius:6px; }
+/* 第一张小、第二张大（都比全宽小、居中） */
+.top-img.small{ width:clamp(120px, 18vw, 220px); }
+.top-img.large{
+  width:clamp(240px, 60%, 720px);
+  margin:0 auto; display:block;
+}
+
+/* 中心竖图 & 4个小圆emoji */
+.cluster{ position:relative; width:clamp(260px, 46vw, 520px); margin: 12px auto 28px; }
+.cluster-main{ width:100%; height:auto; display:block; }
+
+/* 小圆尺寸/风格（可按需调整） */
+:root{
+  --dot: 44px;         /* 小圆直径 */
+  --out: -34px;        /* 相对竖图向外偏移，负值=往外 */
+}
+.dot{
+  position:absolute; width:var(--dot); height:var(--dot);
+  border-radius:50%; background:#efefef;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 14px rgba(0,0,0,.12);
+}
+.dot img{ max-width:70%; max-height:70%; display:block; }
+
+/* 位置：围绕“中心竖图”两侧的上下两排 */
+.dot.left  { left:  var(--out); }
+.dot.right { right: var(--out); }
+.dot.t1    { top: 10%; }   /* 上排 */
+.dot.t2    { top: 66%; }   /* 下排 */
+
+/* 窄屏自适应：小圆略缩、靠内一点，避免出界 */
+:root {
+  --dot: 80px;   /* 小圆直径，从 44px 调大到 64px */
+  --out: -60px;  /* 小圆更大了，要把它们往外挪一点 */
+}
+
+.dot {
+  position: absolute;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: #efefef;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+
+.dot img {
+  max-width: 70%;   /* 图标在圆里保持比例 */
+  max-height: 70%;
+  display: block;
+}
+
+/* 四个小圆——单独指定位置 */
+.dot.left.one  { left: var(--out);  top: 12%; }   /* 左上，稍高 */
+.dot.right.one { right: var(--out); top: 18%; }   /* 右上，略低 */
+.dot.left.two  { left: var(--out);  top: 65%; }   /* 左下，靠下 */
+.dot.right.two { right: var(--out); top: 72%; }   /* 右下，更低 */
+
+/* 文字的css */
+.info-text {
+  text-align: center;     /* 居中 */
+  max-width: 800px;       /* 限制宽度，文字不会太长 */
+  margin: 40px auto;      /* 居中 + 上下间距 */
+  line-height: 1.6;
+}
+
+.info-text h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 20px 0 8px;
+}
+
+.info-text p {
+  font-size: 16px;
+  margin: 0 0 20px;
+  color: #333;
+}
+/*页脚的出手时*/
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: #f7f7f7;   /* 浅灰色背景 */
+  padding: 40px 60px;
+}
+
+/* 左边：LOGO + 大字 */
+.footer-left {
+  position: relative;
+}
+.logo-small {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  z-index: 2;
+}
+.logo-big {
+  font-size: 120px;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.08);  /* 浅灰透明大字 */
+  position: absolute;
+  top: 20px;
+  left: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 中间竖排导航 */
+.site-footer{
+  display:flex;
+  justify-content:space-between;   /* 左右两端对齐 */
+  align-items:flex-start;
+  background:#f5f5f5;
+  padding:40px 60px;               /* 想更靠左就把左侧 padding 调小 */
+  position:relative;
+  overflow:hidden;
+}
+
+/* 左侧：LOGO + 背景大字 */
+.footer-left{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  gap:14px;                        /* LOGO、导航之间的距离 */
+}
+.logo-small{
+  margin:0;
+  font-size:20px;
+  font-weight:700;
+  z-index:2;
+}
+.logo-big{
+  position:absolute;
+  top:8px; left:0;
+  font-size:120px;
+  font-weight:800;
+  color:rgba(0,0,0,.08);           /* 半透明大字 */
+  pointer-events:none;
+  user-select:none;
+}
+
+/* 导航：竖排、贴左、无分隔竖线 */
+.footer-nav{
+  display:flex;
+  flex-direction:column;
+  gap:12px;                        /* 只用间距，不用 | */
+  text-align:left;                 /* 左对齐 */
+  z-index:2;                       /* 压在大字上层 */
+}
+.footer-nav a{
+  color:#111;
+  text-decoration:none;
+  font-size:16px;
+  font-weight:500;
+}
+.footer-nav a:hover{ color:#7b3cff; }
+.footer-right img{
+  width: 52px;   
+  height: auto;  /* 保持比例不变形 */
+  display: block;
+}
+
+  </style>
+</head>
+<body>
+  <header>
+    <!-- 左边LOGO图片 -->
+    <div class="logo">
+      <img src="pic/logo.png" alt="网站LOGO">
+    </div>
+
+    <!-- 中间导航按钮 -->
+     <nav>
+      <a href="#">ホーム</a>
+      <a href="#">最新情報</a>
+      <a href="#">チーム</a>
+    </nav>
+    <!-- 右边购物车和用户 -->
+    <div class="icons">
+<div class="icons">
+  <span class="icon"><img src="pic/cart.png" alt="购物车"></span>
+  <span class="icon"><img src="pic/user.png" alt="用户"></span>
+</div>
+    </div>
+  </header>
+
+<section class="seven-layout">
+  <!-- 顶部两张：第一张小、第二张大（上下堆叠、居中） -->
+  <div class="top-stack">
+    <img class="top-img small" src="pic/0.png" alt="顶部小图">
+    <img class="top-img large" src="pic/1.png" alt="顶部大图">
+  </div>
+
+  <!-- 下面：中心竖图 + 左右各两个小圆emoji -->
+  <div class="cluster">
+    <img class="cluster-main" src="pic/3.png" alt="中心竖图">
+
+    <!-- 上排左右两个 -->
+ <!-- 左右不对称的小圆 -->
+  <span class="dot left one"><img src="pic/2.png" alt=""></span>
+  <span class="dot right one"><img src="pic/4.png" alt=""></span>
+  <span class="dot left two"><img src="pic/5.png" alt=""></span>
+  <span class="dot right two"><img src="pic/6.png" alt=""></span>
+  </div>
+</section>
+<section class="info-text">
+  <h2>タイトル</h2>
+  <p>NBAや国際的な（FIBA）バスケットボール選手の限定</p>
+  <p>トレーディングカードを販売するサイト</p>
+
+  <h2>チームメンバー</h2>
+  <p>李森（Designer）</p>
+<p>李簡行（Engineer）</p>
+<p>オルロフイゴール（Engineer）</p>
+<p>蘭方（Engineer）</p>
+<p></p>ナカガワハンター（Engineer）</p>
+</section>
+<footer class="site-footer">
+  <!-- 左边：Logo + 大字 -->
+  <div class="footer-left">
+    <h1 class="logo-small">SWICH</h1>
+    <div class="logo-big">SWICH</div>
+  </div>
+
+  <!-- 中间：竖排导航 -->
+  <nav class="footer-nav">
+    <a href="#">最新情報</a>
+    <a href="#">コミュニティ</a>
+    <a href="#">チーム紹介</a>
+    <a href="#">カート</a>
+  </nav>
+
+  <!-- 右边：篮球图 -->
+  <div class="footer-right">
+    <img src="pic/ball.png" alt="バスケットボール">
+  </div>
+</footer>
+</body>
+</html>
