@@ -71,3 +71,27 @@ button, a, [role="button"], .cursor-pointer {
 button:hover, a:hover, [role="button"]:hover {
   cursor: pointer !important;
 }
+
+@keyframes float-xy {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  25% { transform: translate3d(6px, -8px, 0) rotate(1deg); }
+  50% { transform: translate3d(0, -12px, 0) rotate(-1deg); }
+  75% { transform: translate3d(-6px, -8px, 0) rotate(0.6deg); }
+  100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+}
+
+.float-soft {
+  animation-name: float-xy;
+  animation-duration: 6s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.float-soft.v1 { animation-duration: 6.0s; animation-delay: 0ms; }
+.float-soft.v2 { animation-duration: 6.6s; animation-delay: 150ms; }
+.float-soft.v3 { animation-duration: 6.3s; animation-delay: 300ms; }
+.float-soft.v4 { animation-duration: 7.0s; animation-delay: 450ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .float-soft { animation: none !important; }
+}
