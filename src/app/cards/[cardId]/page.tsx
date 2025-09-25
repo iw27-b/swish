@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from "react";
-import $ from "jquery";
-import "./style.css"; 
+import React, { use, useEffect, useState } from "react";
+import "./style.css";
 
 interface CardPageProps {
-  params: { cardId: string }; 
+  params: Promise<{ cardId: string }>; // ✅ Next.js 15 params 是 Promise
 }
 
 interface Card {
@@ -34,25 +33,22 @@ interface Card {
 }
 
 export default function CardPage({ params }: CardPageProps) {
+  const { cardId } = use(params); // ✅ 解包 Promise
   const [card, setCard] = useState<Card | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 缩略图点击切换大图
-  useEffect(() => {
-    const handler = (event: JQuery.ClickEvent) => {
-      const src = (event.currentTarget as HTMLImageElement).src;
-      $("#main-image").fadeOut(300, function () {
-        $("#main-image").attr("src", src).fadeIn(300);
-      });
-    };
+  // 搜索框状态
+  const [searchInput, setSearchInput] = useState("");
 
-    $(".thumbnail").on("click", handler);
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Search:", searchInput);
+    // TODO: 这里可以做跳转或者搜索 API 请求
+  };
 
-    return () => {
-      $(".thumbnail").off("click", handler); // ✅ 避免重复绑定
-    };
-  }, [card]);
+  // 大图状态
+  const [mainImage, setMainImage] = useState<string>("");
 
   // 拉取单卡数据
   useEffect(() => {
@@ -61,17 +57,22 @@ export default function CardPage({ params }: CardPageProps) {
         setLoading(true);
         setError(null);
 
-        const response = await fetch(`/api/cards/${params.cardId}`, {
+        const response = await fetch(`/api/cards/${cardId}`, {
           cache: "no-store",
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch card ${params.cardId}`);
-        }
+        if (!response.ok) throw new Error(`Failed to fetch card ${cardId}`);
 
         const data = await response.json();
-        // ✅ 兼容 { data: card } 或 { card: card }
-        setCard(data.data ?? data.card ?? null);
+        const cardData = data.data ?? data.card ?? null;
+        setCard(cardData);
+
+        // 初始化大图
+        if (cardData?.imageUrl) {
+          setMainImage(cardData.imageUrl);
+        } else {
+          setMainImage("/images/card.png");
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -80,7 +81,7 @@ export default function CardPage({ params }: CardPageProps) {
     };
 
     fetchCard();
-  }, [params.cardId]);
+  }, [cardId]);
 
   if (loading) {
     return <p style={{ textAlign: "center", padding: "40px" }}>Loading...</p>;
@@ -100,24 +101,35 @@ export default function CardPage({ params }: CardPageProps) {
 
   return (
     <div>
-      <header className="header">
-        <div className="container">
-          <div className="logo">
-            <a href="/">SWISH</a>
+      {/* 🔍 搜索框 */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+        <form onSubmit={handleSearchSubmit} className="mb-8 w-full">
+          <div className="flex w-full">
+            <div className="relative flex-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="1998 Michael Jordan..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-12 pr-4 py-3 w-full bg-gray-200 rounded-full border-none focus:ring-2 focus:ring-black text-base placeholder-gray-400"
+                style={{ borderRadius: "9999px" }}
+              />
+            </div>
+            <button
+              type="submit"
+              className="ml-3 px-8 py-3 bg-black text-white rounded-full font-semibold text-base hover:bg-gray-900 transition-all shadow-sm"
+              style={{ borderRadius: "9999px", minWidth: "110px" }}
+            >
+              検索
+            </button>
           </div>
-          <nav className="nav">
-            <span>ホーム</span>
-            <div className="divider">|</div>
-            <span>最新情報</span>
-            <div className="divider">|</div>
-            <span>チーム紹介</span>
-          </nav>
-          <div className="avatar">
-            <img src="/images/avatar.png" alt="You" />
-          </div>
-        </div>
-      </header>
+        </form>
+      </div>
 
+      {/* 📄 卡片详情 */}
       <div className="page">
         <main className="gallery">
           {/* 缩略图 */}
@@ -126,18 +138,19 @@ export default function CardPage({ params }: CardPageProps) {
               card.imageUrl || "/images/card.png",
               card.imageUrl || "/images/card.png"].map((img, idx) => (
               <li key={idx}>
-                <img className="thumbnail" src={img} alt={`thumbnail-${idx}`} />
+                <img
+                  className="thumbnail"
+                  src={img}
+                  alt={`thumbnail-${idx}`}
+                  onClick={() => setMainImage(img)} // ✅ React 方式切换大图
+                />
               </li>
             ))}
           </ul>
 
           {/* 大图 */}
           <div className="main-image">
-            <img
-              id="main-image"
-              src={card.imageUrl || "/images/card.png"}
-              alt={card.name}
-            />
+            <img id="main-image" src={mainImage} alt={card.name} />
           </div>
 
           {/* 卡片信息 */}
@@ -153,16 +166,12 @@ export default function CardPage({ params }: CardPageProps) {
 
             <div className="info">
               <div className="row">
-                <span className="label">Player</span>
-                <span className="value">{card.player}</span>
+                <span className="label">Grade</span>
+                <span className="value">{card.condition}</span>
               </div>
               <div className="row">
                 <span className="label">Team</span>
                 <span className="value">{card.team}</span>
-              </div>
-              <div className="row">
-                <span className="label">Grade</span>
-                <span className="value">{card.condition}</span>
               </div>
               <div className="row">
                 <span className="label">Rarity</span>
