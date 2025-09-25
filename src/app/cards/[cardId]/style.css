@@ -201,11 +201,15 @@ body {
   border-radius: 40px;
   background-color: #efefef;
 }
-
 .main-image img {
-  object-fit: cover;
+  width: 250px;
+  height: 472px;
+  object-fit: cover;   
+  display: block;
+  margin: auto;         
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
 
 .introduce {
   width: 292px;
