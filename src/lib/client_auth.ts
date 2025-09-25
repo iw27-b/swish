@@ -37,9 +37,8 @@ export function useAuth(): AuthState & {
 
     const getCurrentUser = async () => {
         try {
-            const response = await fetch('/api/users/me', {
+            const response = await authFetch('/api/users/me', {
                 method: 'GET',
-                credentials: 'include', // Include cookies
             });
 
             if (response.ok) {
@@ -94,7 +93,7 @@ export function useAuth(): AuthState & {
             console.error('Logout error:', error);
         } finally {
             setUser(null);
-            router.push('/login');
+            router.push('/auth/login');
         }
     };
 

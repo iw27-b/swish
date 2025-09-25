@@ -96,7 +96,12 @@ export function hasPermission(
 }
 
 const isOwnProfile = (req: NextRequest, user: JwtPayload): boolean => {
-    const requestedUserId = req.nextUrl.pathname.split('/').pop();
+    const path = req.nextUrl.pathname;
+    // /api/users/me should always be allowed for authenticated users
+    if (path === '/api/users/me') {
+        return true;
+    }
+    const requestedUserId = path.split('/').pop();
     return user.userId === requestedUserId;
 };
 
