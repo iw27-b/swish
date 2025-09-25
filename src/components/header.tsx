@@ -58,7 +58,7 @@ const Header: React.FC = () => {
 
         // TODO: authenticate with the backend and show the user's avatar.
         <header className="px-2 sm:px-4 py-6">
-            <div className="grid grid-cols-3 items-center w-full">
+            <div className="grid grid-cols-3 items-center w-full max-w-screen-lg xl:max-w-screen-xl mx-auto gap-3">
                 <div className="flex items-center" style={{ minWidth: 0 }}>
                     <div className="text-black font-bold text-2xl sm:text-4xl uppercase tracking-wide mr-2">
                         <Link href="/">SWISH</Link>
