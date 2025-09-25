@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Image from 'next/image';
-import CategoryFilter, { SelectedFilters } from '@/components/cards/category_filter';
-import CardGrid from '@/components/cards/card_grid';
-import CardsToolbar from '@/components/cards/cards_toolbar';
-import { BannerCarousel } from '@/components/banner_carousel';
-import Pagination from '@/components/cards/pagination';
-import { Loader2 } from 'lucide-react';
+import { SelectedFilters } from '@/components/cards/category_filter';
+import BannerSection from '@/components/cards/banner_section';
+import RecommendedSection from '@/components/cards/recommended_section';
+import FilterSection from '@/components/cards/filter_section';
+import CardsContentSection from '@/components/cards/cards_content_section';
+import ErrorBoundary from '@/components/error_boundary';
+import LoadingSkeleton from '@/components/loading_skeleton';
+import { Search } from 'lucide-react';
 
 interface Card {
     id: string;
@@ -198,183 +200,96 @@ const CardsPage: React.FC = () => {
     }, []);
 
     return (
-        <div className="min-h-screen">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-                <form onSubmit={handleSearchSubmit} className="mb-8 w-full">
-                    <div className="flex w-full">
-                        <div className="relative flex-1">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2">
-                                <Image src="/images/icons8-search 1.svg" alt="search" width={20} height={20} />
-                            </span>
-                            <input
-                                type="text"
-                                placeholder="検索内容を入力してください"
-                                value={searchInput}
-                                onChange={e => setSearchInput(e.target.value)}
-                                className="pl-12 pr-4 py-3 w-full bg-gray-200 rounded-full border-none focus:ring-2 focus:ring-black text-base placeholder-gray-500"
-                                style={{ borderRadius: '9999px' }}
-                            />
-                        </div>
+        <ErrorBoundary
+            fallback={
+                <div className="min-h-screen flex items-center justify-center">
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
+                        <p className="text-gray-600 mb-4">The cards page encountered an error and couldn't load properly.</p>
                         <button
-                            type="submit"
-                            className="ml-3 px-8 py-3 bg-black text-white rounded-full font-semibold text-base hover:bg-gray-900 transition-all shadow-sm"
-                            style={{ borderRadius: '9999px', minWidth: '110px' }}
+                            onClick={() => window.location.reload()}
+                            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
                         >
-                            検索
+                            Reload Page
                         </button>
                     </div>
-                </form>
-            </div>
-                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <BannerCarousel height="300px" autoPlay={true} intervalMs={4000} />
                 </div>
-
-                {/* おすすめのアイテムセクション */}
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10">
-                        <h2 className="text-3xl font-bold mb-6">おすすめのアイテム</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-                            {[
-                                {
-                                    img: '/images/cards/osusume-1.png',
-                                    title: 'NBA Star-Cards',
-                                    desc: '1991 フリーア #29 マイケル・ジョーダン・ ブルズ HOF PSA 10',
-                                    price: 'US $240.44',
-                                },
-                                {
-                                    img: '/images/cards/osusume-2.png',
-                                    title: 'NBA Star-Cards',
-                                    desc: 'Stephen Curry 2024 Topps Now Olympic Games #27 Graded Gem Mint 10',
-                                    price: 'US $34.99',
-                                },
-                                {
-                                    img: '/images/cards/osusume-3.png',
-                                    title: 'NBA Star-Cards',
-                                    desc: '2019-20 Panini Prizm Kevin Durant #210 PSA 8',
-                                    price: 'US $240.44',
-                                },
-                                {
-                                    img: '/images/cards/osusume-4.png',
-                                    title: 'NBA Star-Cards',
-                                    desc: '2023-24 Panini Prizm Prizms White #199\nYao Ming/175 - FB',
-                                    price: 'US $30.00',
-                                },
-                            ].map((card, i) => (
-                                <div key={i} className="flex flex-col items-center">
-                                    <div className="relative w-full bg-gray-100 rounded-[32px] py-6 px-6 flex flex-col items-center">
-                                        <button
-                                            className="absolute top-5 right-5 w-10 h-10 bg-white rounded-full flex items-center justify-center"
-                                            aria-label="like"
-                                        >
-                                            <Image src="/images/Vector.svg" alt="like" width={20} height={20} className="w-5 h-5" />
-                                        </button>
-                                        <Image
-                                            src={card.img}
-                                            alt={card.desc}
-                                            width={300}
-                                            height={192}
-                                            className="w-full h-48 object-contain"
-                                            style={{ borderRadius: 16 }}
-                                        />
-                                    </div>
-                                    <div className="w-full text-left mt-3">
-                                        <div className="text-gray-400 text-xs mb-1">{card.title}</div>
-                                        <div className="text-black text-sm font-normal mb-2 whitespace-pre-line">{card.desc}</div>
-                                        <div className="text-black text-xl font-bold">{card.price}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        </div>
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
-                <div className="flex gap-8">
-                    <div className="w-64 flex-shrink-0">
-                        <div className="">
-                            <CategoryFilter
-                                onFilterChange={handleFilterChange}
-                                initialFilters={currentFilters}
-                            />
-                        </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex flex-col gap-6 w-full">
-                            <div className="w-full">
-                                <CardsToolbar
-                                    totalCards={totalCount}
-                                    currentFilters={currentFilters}
-                                    onViewModeChange={(mode) => {
-                                        console.log('View mode changed:', mode);
-                                    }}
-                                    onSortChange={handleSortChange}
-                                    onPriceRangeChange={handlePriceRangeChange}
-                                    onFilterRemove={(filterType, value) => {
-                                        console.log('Filter remove requested:', filterType, value);
-                                        const newFilters = { ...currentFilters };
-                                        if (filterType === 'organizations') {
-                                            newFilters.organizations = newFilters.organizations.filter(org => org !== value);
-                                        } else if (filterType === 'signed') {
-                                            newFilters.signed = null;
-                                        } else if (filterType === 'players') {
-                                            newFilters.players = newFilters.players.filter(player => player !== value);
-                                        } else if (filterType === 'seasons') {
-                                            newFilters.seasons = newFilters.seasons.filter(season => season !== value);
-                                        }
-                                        handleFilterChange(newFilters);
-                                    }}
+            }
+        >
+            <div className="min-h-screen">
+                {/* Search Section */}
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+                    <form onSubmit={handleSearchSubmit} className="mb-8 w-full">
+                        <div className="flex w-full">
+                            <div className="relative flex-1">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2">
+                                    <Search className="text-gray-500"/>
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="1998 Michael Jordan..."
+                                    value={searchInput}
+                                    onChange={e => setSearchInput(e.target.value)}
+                                    className="pl-12 pr-4 py-3 w-full bg-gray-200 rounded-full border-none focus:ring-2 focus:ring-black text-base placeholder-gray-400"
+                                    style={{ borderRadius: '9999px' }}
                                 />
                             </div>
-                            <div className="w-full">
-                                {loading && (
-                                    <div className="flex items-center justify-center py-12">
-                                        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-                                        <span className="ml-3 text-gray-600">Loading cards...</span>
-                                    </div>
-                                )}
-                                {error && (
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                                        <div className="flex">
-                                            <div className="flex-shrink-0">
-                                                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                                </svg>
-                                            </div>
-                                            <div className="ml-3">
-                                                <h3 className="text-sm font-medium text-red-800">Error loading cards</h3>
-                                                <div className="mt-2 text-sm text-red-700">
-                                                    <p>{error}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                {!loading && !error && (
-                                    <>
-                                        {transformedProducts.length > 0 ? (
-                                            <CardGrid products={transformedProducts} />
-                                        ) : (
-                                            <div className="text-center py-12">
-                                                <div className="max-w-md mx-auto">
-                                                    <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                                    </svg>
-                                                    <h3 className="text-lg font-medium text-gray-900 mb-2">No cards found</h3>
-                                                    <p className="text-gray-600">Try adjusting your filters to see more results.</p>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <Pagination
-                                            currentPage={currentPage}
-                                            totalPages={totalPages}
-                                            onPageChange={handlePageChange}
-                                            className="mt-8 mb-12"
-                                        />
-                                    </>
-                                )}
-                            </div>
+                            <button
+                                type="submit"
+                                className="ml-3 px-8 py-3 bg-black text-white rounded-full font-semibold text-base hover:bg-gray-900 transition-all shadow-sm"
+                                style={{ borderRadius: '9999px', minWidth: '110px' }}
+                            >
+                                検索
+                            </button>
                         </div>
+                    </form>
+                </div>
+
+                <BannerSection />
+
+                <RecommendedSection />
+                
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+                    <div className="flex gap-8">
+
+                        <FilterSection
+                            onFilterChange={handleFilterChange}
+                            initialFilters={currentFilters}
+                        />
+                        
+                        <CardsContentSection
+                            cards={transformedProducts}
+                            loading={loading}
+                            error={error}
+                            totalCount={totalCount}
+                            currentFilters={currentFilters}
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            onViewModeChange={(mode) => {
+                                console.log('View mode changed:', mode);
+                            }}
+                            onSortChange={handleSortChange}
+                            onPriceRangeChange={handlePriceRangeChange}
+                            onFilterRemove={(filterType, value) => {
+                                console.log('Filter remove requested:', filterType, value);
+                                const newFilters = { ...currentFilters };
+                                if (filterType === 'organizations') {
+                                    newFilters.organizations = newFilters.organizations.filter(org => org !== value);
+                                } else if (filterType === 'signed') {
+                                    newFilters.signed = null;
+                                } else if (filterType === 'players') {
+                                    newFilters.players = newFilters.players.filter(player => player !== value);
+                                } else if (filterType === 'seasons') {
+                                    newFilters.seasons = newFilters.seasons.filter(season => season !== value);
+                                }
+                                handleFilterChange(newFilters);
+                            }}
+                            onPageChange={handlePageChange}
+                        />
                     </div>
                 </div>
             </div>
-        </div>
+        </ErrorBoundary>
     );
 };
 
