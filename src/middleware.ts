@@ -34,7 +34,7 @@ export async function middleware(req: NextRequest) {
 
     const isPublic = publicPaths.some(p => {
         if (p === '/api/cards' && method === 'GET') {
-            return path === '/api/cards'; 
+            return path === '/api/cards' || path.startsWith('/api/cards/'); 
         }
         return path.startsWith(p);
     });
