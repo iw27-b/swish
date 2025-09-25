@@ -15,6 +15,7 @@ const publicPaths: string[] = [
     '/api/auth/verify_email',
     '/api/auth/refresh', 
     '/api/cards', 
+    '/api/cards/recommended',
     '/api/marketplace', 
     '/api/search',
     '/api/search/quick',

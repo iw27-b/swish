@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { UserRound } from 'lucide-react';
+import { ShoppingBag, UserRound } from 'lucide-react';
 import { useAuth } from '@/lib/client_auth';
 
 const Header: React.FC = () => {
@@ -31,7 +31,10 @@ const Header: React.FC = () => {
                         className="px-5 py-2 bg-black text-white rounded-full font-semibold text-base hover:bg-gray-900 transition-all shadow-sm flex items-center"
                         style={{ borderRadius: '9999px', minWidth: '70px', height: '40px' }}
                     >
-                        <Image src="/images/icons8-purse 1.svg" alt="cart" width={20} height={20} className="mr-2" />
+                        {/* Use Lucide's ShoppingBag icon for the cart */}
+                        <span className="mr-2 flex items-center">
+                            <ShoppingBag className="w-5 h-5" />
+                        </span>
                         Cart
                     </Link>
                     <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-full bg-transparent border-18 border-black flex items-center justify-center" style={{ minWidth: '40px', minHeight: '40px' }}>

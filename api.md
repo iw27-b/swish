@@ -536,6 +536,46 @@ Sets secure HttpOnly cookies for authentication.
 - Logs structured error events for observability on image cleanup failures
 - Returns partial success status when card deletion succeeds but image cleanup fails
 
+### GET `/api/cards/recommended`
+**Description:** Get today's recommended cards (4 random cards that refresh daily)
+**Authentication:** Not required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "recommendations": [
+      {
+        "id": "card_id",
+        "name": "1998 Upper Deck Michael Jordan",
+        "player": "Michael Jordan",
+        "team": "Chicago Bulls",
+        "year": 1998,
+        "brand": "Upper Deck",
+        "condition": "MINT",
+        "rarity": "RARE",
+        "price": 199.99,
+        "imageUrl": "https://...",
+        "owner": {
+          "id": "owner_id",
+          "name": "Card Owner",
+          "email": "owner@example.com"
+        }
+      }
+    ]
+  },
+  "message": "Daily recommended cards retrieved successfully"
+}
+```
+
+**Features:**
+- Returns 4 randomly selected cards that are available for sale
+- Uses deterministic randomization based on current date for consistency throughout the day
+- Cards refresh automatically at midnight or when the application restarts
+- In-memory caching for optimal performance
+- Only recommends cards that are marked as `isForSale: true`
+
 ---
 
 ## Search
