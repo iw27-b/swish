@@ -98,7 +98,7 @@ const CardsPage: React.FC = () => {
             queryParams.append('pageSize', '9');
 
             if (filters.players.length > 0) {
-                queryParams.append('player', filters.players[0]);
+                queryParams.append('players', filters.players.join(','));
             }
 
             if (filters.seasons.length > 0) {
