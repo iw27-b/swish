@@ -106,15 +106,21 @@ const Header: React.FC = () => {
                         </span>
                         Cart
                     </Link>
-                    <div className="w-10 h-10 sm:w-10 sm:h-10 rounded-full bg-transparent border-18 border-black flex items-center justify-center" style={{ minWidth: '40px', minHeight: '40px' }}>
+                    <Link href="/me" className="w-10 h-10 sm:w-10 sm:h-10 rounded-full bg-transparent border-18 border-black flex items-center justify-center" style={{ minWidth: '40px', minHeight: '40px' }}>
                         {user ? (
-                            <Image src={user.profileImageUrl || '/images/avatar.png'} alt="You" width={40} height={40} style={{ objectFit: 'cover', borderRadius: '9999px' }} />
+                            user.profileImageUrl ? (
+                                <Image src={user.profileImageUrl} alt="You" width={40} height={40} style={{ objectFit: 'cover', borderRadius: '9999px' }} />
+                            ) : (
+                                <span className="flex items-center justify-center w-8 h-8 bg-black rounded-full">
+                                    <UserRound className="w-6 h-6 text-white" />
+                                </span>
+                            )
                         ) : (
                             <span className="flex items-center justify-center w-8 h-8 bg-black rounded-full">
                                 <UserRound className="w-6 h-6 text-white" />
                             </span>
                         )}
-                    </div>
+                    </Link>
                 </div>
             </div>
         </header>
