@@ -172,7 +172,12 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-    matcher: [
-        '/api/:path*', 
-    ],
-}; 
+  matcher: [
+    "/api/auth/:path*",
+    "/api/cart/:path*",
+    "/api/collections/:path*",
+    "/api/images/:path*",
+    // 其他需要保护的 API
+  ],
+};
+

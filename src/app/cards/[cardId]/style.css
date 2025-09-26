@@ -1,0 +1,298 @@
+/* 页面整体排版 */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #000;
+}
+
+/* 头部区域 */
+.header {
+  padding: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* 内部容器：限制宽度并左右对齐 */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* LOGO 样式 */
+.logo a {
+  text-decoration: none;
+  font-size: 28px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: black;
+  letter-spacing: 2px;
+}
+
+/* 导航菜单 */
+.nav {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* 分隔符 */
+.divider {
+  margin: 0 5px;
+}
+
+/* 头像区域 */
+.avatar {
+  width: 64px;
+  height: 64px;
+  border: 2px solid black;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 头像图片 */
+.avatar img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+@media (max-width: 640px) {
+  .nav {
+    display: none;
+  }
+}
+
+/* 页面整体 */
+.page {
+  min-height: 100vh;
+  padding-top: 2rem;
+  font-family: Arial, sans-serif;
+}
+
+/* 外层容器 */
+.search-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* 表单 */
+.search-form {
+  margin-bottom: 2rem;
+  width: 100%;
+}
+
+.search-wrapper {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px 16px 12px 44px;
+  border: none;
+  border-radius: 9999px;
+  background-color: #e5e5e5;
+  font-size: 16px;
+  color: #333;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px black;
+}
+
+.search-btn {
+  margin-left: 12px;
+  padding: 12px 24px;
+  background-color: black;
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  min-width: 110px;
+  transition: background-color 0.3s ease;
+}
+
+.search-btn:hover {
+  background-color: #333;
+}
+
+/* Gallery */
+.gallery {
+  max-width: 1200px;
+  height: 520px;
+  margin: 0 auto;
+  display: flex;
+  gap: 24px;
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+/* 缩略图纵向排列 */
+.thumbnails {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.thumbnails li {
+  width: 92px;
+  height: 92px;
+  background: #efefef;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.thumbnail {
+  max-width: 50%;
+  max-height: 60%;
+  object-fit: contain;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.thumbnail:hover {
+  transform: scale(1.05);
+}
+
+/* 大图 */
+.main-image {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.main-image {
+  width: 756px;
+  height: 520px;
+  border-radius: 40px;
+  background-color: #efefef;
+}
+.main-image img {
+  width: 250px;
+  height: 472px;
+  object-fit: cover;   
+  display: block;
+  margin: auto;         
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+
+.introduce {
+  width: 292px;
+  height: 520px;
+  font-family: Arial, sans-serif;
+  color: #000;
+}
+
+.introduce .title {
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 32px;
+  margin: 0;
+}
+
+.introduce .subtitle {
+  font-size: 16px;
+  color: #999;
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.introduce .divider2 {
+  border: none;
+  border-top: 1px dotted #999;
+  width: 292px;
+  margin: 20px 0;
+}
+
+.introduce .price {
+  font-size: 28px;
+  font-weight: bold;
+  color: #000;
+  margin: 0 0 40px;
+}
+
+.introduce .info .row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.introduce .info .label {
+  font-size: 16px;
+  color: #999;
+}
+
+.introduce .info .value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #000;
+}
+
+.introduce .btn {
+  width: 292px;
+  height: 56px;
+  border-radius: 40px;
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 56px;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.introduce .btn.primary {
+  background: #000;
+  color: #fff;
+  border: 1px solid #000;
+}
+
+.introduce .btn.primary:hover {
+  background: #fff;
+  color: #000;
+}
+
+.introduce .btn.secondary {
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+}
+
+.introduce .btn.secondary:hover {
+  background: #000;
+  color: #fff;
+}
