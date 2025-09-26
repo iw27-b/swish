@@ -111,6 +111,7 @@ const BaseCardListQuerySchema = z.object({
     pageSize: z.coerce.number().min(1).max(100).optional().default(10),
     search: z.string().max(100).optional(),
     player: z.string().max(50).optional(),
+    players: z.string().max(500).optional(), // Comma-separated list of players
     team: z.string().max(30).optional(),
     brand: z.string().max(30).optional(),
     year: z.coerce.number().int().min(1950).max(new Date().getFullYear()).optional(),
