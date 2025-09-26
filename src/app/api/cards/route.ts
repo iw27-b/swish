@@ -52,7 +52,6 @@ export async function GET(req: NextRequest) {
             pageSize,
             search,
             player,
-            players,
             team,
             brand,
             year,
@@ -77,14 +76,7 @@ export async function GET(req: NextRequest) {
             ];
         }
 
-        if (players) {
-            const playerList = players.split(',').map(p => p.trim()).filter(p => p.length > 0);
-            if (playerList.length > 0) {
-                where.player = {
-                    in: playerList
-                };
-            }
-        } else if (player) {
+        if (player) {
             where.player = { contains: player, mode: 'insensitive' };
         }
 
@@ -164,7 +156,7 @@ export async function GET(req: NextRequest) {
                 pageSize,
                 total,
                 search,
-                filters: { player, players, team, brand, year, condition, rarity, isForTrade, isForSale }
+                filters: { player, team, brand, year, condition, rarity, isForTrade, isForSale }
             },
         });
 
