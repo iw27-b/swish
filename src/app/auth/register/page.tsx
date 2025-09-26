@@ -3,7 +3,7 @@
 import React, { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Facebook, Apple } from "lucide-react";
+import Image from "next/image";
 
 export default function RegisterPage(): React.ReactElement {
     const router = useRouter();
@@ -103,13 +103,14 @@ export default function RegisterPage(): React.ReactElement {
                         ) : null}
                         <div className="icon-row flex items-center gap-2 flex-nowrap">
                             <button type="button" className="img-btn flex-[0_0_auto] w-[220px] h-[44px] px-3 rounded-[14px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10">
+                                <Image src="/images/auth/google.svg" alt="Google" width={16} height={16} className="mr-2" />
                                 <span className="text-sm font-semibold text-[#111]">Googleで登録</span>
                             </button>
                             <button type="button" className="img-btn flex-[0_0_auto] w-[44px] h-[44px] p-[6px] rounded-[12px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10" aria-label="Facebookで登録">
-                                <Facebook className="w-5 h-5 text-[#1877F2]" />
+                                <Image src="/images/auth/facebook.svg" alt="Facebook" width={16} height={16}/>
                             </button>
                             <button type="button" className="img-btn flex-[0_0_auto] w-[44px] h-[44px] p-[6px] rounded-[12px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10" aria-label="Appleで登録">
-                                <Apple className="w-5 h-5 text-black" />
+                                <Image src="/images/auth/apple.svg" alt="Apple" width={16} height={16}/>
                             </button>
                         </div>
 
