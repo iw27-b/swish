@@ -5,7 +5,7 @@ import { JwtPayload } from '@/types';
 
 export const ADMIN_ROLE = 'ADMIN';
 
-const publicPaths: string[] = [
+const PUBLIC_EXACT = new Set([
     '/api/health',
     '/api/health/db',
     '/api/auth/login',
@@ -13,38 +13,130 @@ const publicPaths: string[] = [
     '/api/auth/forgot-password',
     '/api/auth/reset-password',
     '/api/auth/verify_email',
-    '/api/auth/refresh', 
-    '/api/cards', 
-    '/api/cards/recommended',
-    '/api/marketplace', 
+    '/api/auth/refresh',
+    '/api/marketplace',
     '/api/search',
     '/api/search/quick',
     '/api/search/filters',
-    '/api/images/banner',
+    '/api/images/banner'
+]);
+
+function isPublicCardsGet(path: string, method: string) {
+    if (method !== 'GET') return false;
+    if (path === '/api/cards') return true;
+    return path.startsWith('/api/cards/');
+}
+
+interface RouteRule {
+    pattern: RegExp;
+    methods: string[];
+    resolve: (req: NextRequest, payload: JwtPayload) => { resource?: string; action?: string };
+}
+
+const ROUTE_RULES: RouteRule[] = [
+    {
+        pattern: /^\/api\/users$/,
+        methods: ['GET'],
+        resolve: (req, payload) => ({ resource: 'users', action: 'manage:any' })
+    },
+    {
+        pattern: /^\/api\/users\/me$/,
+        methods: ['GET', 'PATCH'],
+        resolve: (req, payload) => ({ resource: 'profile', action: req.method === 'GET' ? 'read:own' : 'update:own' })
+    },
+    {
+        pattern: /^\/api\/users\/([^/]+)$/,
+        methods: ['GET', 'PATCH', 'DELETE'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') {
+                return { resource: 'profile', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
+            }
+            if (req.method === 'PATCH') return { resource: 'profile', action: 'update:own' };
+            if (req.method === 'DELETE') return { resource: 'profile', action: 'delete:any' };
+            return {};
+        }
+    },
+    {
+        pattern: /^\/api\/users\/([^/]+)\/favorites$/,
+        methods: ['GET', 'POST', 'DELETE'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') return { resource: 'favorites', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
+            if (req.method === 'POST') return { resource: 'favorites', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' };
+            if (req.method === 'DELETE') return { resource: 'favorites', action: payload.role === ADMIN_ROLE ? 'delete:any' : 'delete:own' };
+            return {};
+        }
+    },
+    {
+        pattern: /^\/api\/auth\/send_verification_email$/,
+        methods: ['POST'],
+        resolve: () => ({ resource: 'auth', action: 'request:emailVerification' })
+    },
+    {
+        pattern: /^\/api\/auth\/logout$/,
+        methods: ['POST'],
+        resolve: () => ({ resource: 'auth', action: 'logout' })
+    },
+    {
+        pattern: /^\/api\/auth\/change-password$/,
+        methods: ['POST'],
+        resolve: () => ({ resource: 'auth', action: 'change:password' })
+    },
+    {
+        pattern: /^\/api\/cards(\/.*)?$/,
+        methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') return { resource: 'cards', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
+            if (req.method === 'POST') return { resource: 'cards', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' };
+            if (req.method === 'PATCH') return { resource: 'cards', action: payload.role === ADMIN_ROLE ? 'update:any' : 'update:own' };
+            if (req.method === 'DELETE') return { resource: 'cards', action: payload.role === ADMIN_ROLE ? 'delete:any' : 'delete:own' };
+            return {};
+        }
+    },
+    {
+        pattern: /^\/api\/trades(\/.*)?$/,
+        methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
+            if (req.method === 'POST') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' };
+            if (req.method === 'PATCH' || req.method === 'DELETE') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'update:any' : 'update:own' };
+            return {};
+        }
+    },
+    {
+        pattern: /^\/api\/purchases(\/.*)?$/,
+        methods: ['GET', 'POST', 'PATCH'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') return { resource: 'purchases', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
+            if (req.method === 'POST') return { resource: 'purchases', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' };
+            if (req.method === 'PATCH') return { resource: 'purchases', action: payload.role === ADMIN_ROLE ? 'update:any' : 'update:own' };
+            return {};
+        }
+    },
+    {
+        pattern: /^\/api\/cart\/checkout$/,
+        methods: ['POST'],
+        resolve: (req, payload) => ({ resource: 'purchases', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' })
+    }
 ];
 
 export async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
-    const method = req.method;
-
+    const method = req.method.toUpperCase();
 
     if (!path.startsWith('/api/')) {
         return NextResponse.next();
     }
 
-    const isPublic = publicPaths.some(p => {
-        if (p === '/api/cards' && method === 'GET') {
-            return path === '/api/cards' || path.startsWith('/api/cards/'); 
-        }
-        return path.startsWith(p);
-    });
+    if (method === 'OPTIONS') {
+        return new NextResponse(null, { status: 204 });
+    }
 
+    const isPublic = PUBLIC_EXACT.has(path) || isPublicCardsGet(path, method);
     if (isPublic) {
         return NextResponse.next();
     }
 
     let accessToken = parseTokenFromCookie(req.headers.get('cookie'), 'access_token');
-
     if (!accessToken) {
         const authHeader = req.headers.get('authorization');
         if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -53,126 +145,54 @@ export async function middleware(req: NextRequest) {
     }
 
     if (!accessToken) {
-        return NextResponse.json({ 
-            success: false,
-            message: 'Authentication required' 
-        }, { status: 401 });
+        return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
     }
 
     const decodedPayload: JwtPayload | null = await verifyToken(accessToken);
-    
+
     if (!decodedPayload) {
         const refreshToken = parseTokenFromCookie(req.headers.get('cookie'), 'refresh_token');
-        
         if (!refreshToken || !(await verifyRefreshToken(refreshToken))) {
-            const response = NextResponse.json({ 
-                success: false,
-                message: 'Invalid or expired token' 
-            }, { status: 401 });
-            
+            const response = NextResponse.json({ success: false, message: 'Invalid or expired token' }, { status: 401 });
             response.cookies.delete('access_token');
             response.cookies.delete('refresh_token');
             response.cookies.delete('user_data');
-            
             return response;
         }
-        
         const refreshUrl = new URL('/api/auth/refresh', req.url);
         refreshUrl.searchParams.set('redirect', path);
         return NextResponse.redirect(refreshUrl);
     }
 
-    let resource = '';
-    let action = '';
+    const matched = ROUTE_RULES.find(r => r.pattern.test(path));
+    let resource: string | undefined;
+    let action: string | undefined;
 
-    if (path.startsWith('/api/users')) {
-        resource = 'profile';
-        const isSpecificUserPath = path.split('/').length > 3;
-        const isMeEndpoint = path === '/api/users/me';
-        
-        if (method === 'GET') {
-            if (isMeEndpoint) {
-                action = 'read:own'; // /api/users/me should always be allowed for authenticated users
-            } else if (isSpecificUserPath) {
-                action = 'read:own';
-                if (decodedPayload.role === ADMIN_ROLE) action = 'read:any';
-            } else {
-                action = 'list:any';
-            }
+    if (matched) {
+        if (matched.methods.length && !matched.methods.includes(method)) {
+            return NextResponse.json({ success: false, message: 'Method Not Allowed' }, { status: 405 });
         }
-        if (method === 'PATCH') action = 'update:own';
-        if (method === 'DELETE') action = 'delete:any';
-
-        if (resource === 'profile' && action === 'list:any' && decodedPayload.role === ADMIN_ROLE) {
-            resource = 'users';
-            action = 'manage:any';
-        } 
-    } else if (path.startsWith('/api/auth/send_verification_email')) {
-        resource = 'auth';
-        action = 'request:emailVerification';
-    } else if (path.startsWith('/api/auth/logout')) {
-        resource = 'auth';
-        action = 'logout';
-    } else if (path.startsWith('/api/auth/change-password')) {
-        resource = 'auth';
-        action = 'change:password';
-    } else if (path.startsWith('/api/cards')) {
-        if (method === 'GET') {
-            resource = 'cards';
-            action = 'read:own';
-        } else if (method === 'POST') {
-            resource = 'cards';
-            action = 'create:own';
-        } else if (method === 'PATCH' || method === 'DELETE') {
-            resource = 'cards';
-            action = method === 'PATCH' ? 'update:own' : 'delete:own';
-        }
-    } else if (path.startsWith('/api/trades')) {
-        resource = 'trades';
-        if (method === 'GET') {
-            action = 'read:own';
-        } else if (method === 'POST') {
-            action = 'create:own';
-        } else if (method === 'PATCH' || method === 'DELETE') {
-            action = 'update:own';
-        }
-    } else if (path.startsWith('/api/purchases')) {
-        resource = 'purchases';
-        if (method === 'GET') {
-            action = 'read:own';
-        } else if (method === 'POST') {
-            action = 'create:own';
-        } else if (method === 'PATCH') {
-            action = 'update:own';
-        }
-    } else if (path.startsWith('/api/cart/checkout')) {
-        resource = 'purchases';
-        if (method === 'POST') {
-            action = 'create:own';
-        }
+        ({ resource, action } = matched.resolve(req, decodedPayload));
     }
 
     if (resource && action) {
-        if (!hasPermission(decodedPayload.role, resource, action, req, decodedPayload)) {
-            let message = 'Forbidden: You do not have permission to perform this action.';
-            if (action.includes(':own') && resource === 'profile') {
-                message = 'Forbidden: You can only perform this action on your own profile.';
-            }
-            if ((action.includes(':any') || action === 'delete:any') && decodedPayload.role !== ADMIN_ROLE) {
-                message = 'Forbidden: Admin access required.';
-            }
-            return NextResponse.json({ 
-                success: false,
-                message 
-            }, { status: 403 });
+        const permitted = hasPermission(decodedPayload.role, resource, action, req, decodedPayload);
+        if (!permitted) {
+            let message = 'Forbidden';
+            if (resource === 'profile' && action.includes(':own')) message = 'Forbidden: profile ownership required';
+            else if (resource === 'favorites' && action.includes(':own')) message = 'Forbidden: favorites ownership required';
+            else if (action.includes(':any') && decodedPayload.role !== ADMIN_ROLE) message = 'Forbidden: admin required';
+            return NextResponse.json({ success: false, message }, { status: 403 });
         }
     }
-    
-    return NextResponse.next();
+
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set('x-user-data', JSON.stringify({ userId: decodedPayload.userId, role: decodedPayload.role }));
+    if (!requestHeaders.get('x-request-id')) {
+        requestHeaders.set('x-request-id', crypto.randomUUID());
+    }
+
+    return NextResponse.next({ request: { headers: requestHeaders } });
 }
 
-export const config = {
-    matcher: [
-        '/api/:path*', 
-    ],
-}; 
+export const config = { matcher: ['/api/:path*'] };
