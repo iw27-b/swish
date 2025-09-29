@@ -7,6 +7,9 @@ const rolePermissions: Record<Role, { grants: Array<{ resource: string; action: 
         grants: [
             { resource: 'profile', action: 'read:own' },
             { resource: 'profile', action: 'update:own' },
+            { resource: 'favorites', action: 'read:own' },
+            { resource: 'favorites', action: 'create:own' },
+            { resource: 'favorites', action: 'delete:own' },
             { resource: 'auth', action: 'request:emailVerification' },
             { resource: 'auth', action: 'logout' },
             { resource: 'auth', action: 'change:password' },
@@ -26,6 +29,9 @@ const rolePermissions: Record<Role, { grants: Array<{ resource: string; action: 
         grants: [
             { resource: 'profile', action: 'read:own' },
             { resource: 'profile', action: 'update:own' },
+            { resource: 'favorites', action: 'read:own' },
+            { resource: 'favorites', action: 'create:own' },
+            { resource: 'favorites', action: 'delete:own' },
             { resource: 'auth', action: 'request:emailVerification' },
             { resource: 'auth', action: 'logout' },
             { resource: 'auth', action: 'change:password' },
@@ -48,6 +54,9 @@ const rolePermissions: Record<Role, { grants: Array<{ resource: string; action: 
             { resource: 'profile', action: 'update:any' },
             { resource: 'profile', action: 'delete:any' },
             { resource: 'users', action: 'manage:any' },
+            { resource: 'favorites', action: 'read:any' },
+            { resource: 'favorites', action: 'create:any' },
+            { resource: 'favorites', action: 'delete:any' },
             { resource: 'auth', action: 'request:emailVerification' },
             { resource: 'auth', action: 'logout' },
             { resource: 'auth', action: 'change:password' },
@@ -84,25 +93,30 @@ export function hasPermission(
     const permissions = rolePermissions[role];
     if (!permissions) return false;
 
-    return permissions.grants.some(grant => {
-        if (grant.resource === resource && grant.action === action) {
-            if (grant.condition) {
-                return grant.condition(req, user);
-            }
-            return true;
-        }
+    const matchingGrant = permissions.grants.find(grant =>
+        grant.resource === resource && grant.action === action
+    );
+
+    if (!matchingGrant) {
         return false;
-    });
+    }
+
+    if (matchingGrant.condition) {
+        return matchingGrant.condition(req, user);
+    }
+
+    return true;
 }
 
 const isOwnProfile = (req: NextRequest, user: JwtPayload): boolean => {
     const path = req.nextUrl.pathname;
+
     // /api/users/me should always be allowed for authenticated users
     if (path === '/api/users/me') {
         return true;
     }
-    const requestedUserId = path.split('/').pop();
-    return user.userId === requestedUserId;
+
+    return !!user && typeof user.userId === 'string' && user.userId.length > 0;
 };
 
 const isOwnUserForEmailVerification = (req: NextRequest, user: JwtPayload): boolean => {
@@ -125,6 +139,22 @@ if (userEmailVerificationGrant) {
     userEmailVerificationGrant.condition = isOwnUserForEmailVerification;
 }
 
+// Apply conditions for USER favorites
+const userFavoritesReadGrant = rolePermissions[Role.USER].grants.find(g => g.action === 'read:own' && g.resource === 'favorites');
+if (userFavoritesReadGrant) {
+    userFavoritesReadGrant.condition = isOwnProfile;
+}
+
+const userFavoritesCreateGrant = rolePermissions[Role.USER].grants.find(g => g.action === 'create:own' && g.resource === 'favorites');
+if (userFavoritesCreateGrant) {
+    userFavoritesCreateGrant.condition = isOwnProfile;
+}
+
+const userFavoritesDeleteGrant = rolePermissions[Role.USER].grants.find(g => g.action === 'delete:own' && g.resource === 'favorites');
+if (userFavoritesDeleteGrant) {
+    userFavoritesDeleteGrant.condition = isOwnProfile;
+}
+
 // Apply conditions for SELLER role
 const sellerProfileReadGrant = rolePermissions[Role.SELLER].grants.find(g => g.action === 'read:own' && g.resource === 'profile');
 if (sellerProfileReadGrant) {
@@ -139,6 +169,22 @@ if (sellerProfileUpdateGrant) {
 const sellerEmailVerificationGrant = rolePermissions[Role.SELLER].grants.find(g => g.action === 'request:emailVerification');
 if (sellerEmailVerificationGrant) {
     sellerEmailVerificationGrant.condition = isOwnUserForEmailVerification;
+}
+
+// Apply conditions for SELLER favorites
+const sellerFavoritesReadGrant = rolePermissions[Role.SELLER].grants.find(g => g.action === 'read:own' && g.resource === 'favorites');
+if (sellerFavoritesReadGrant) {
+    sellerFavoritesReadGrant.condition = isOwnProfile;
+}
+
+const sellerFavoritesCreateGrant = rolePermissions[Role.SELLER].grants.find(g => g.action === 'create:own' && g.resource === 'favorites');
+if (sellerFavoritesCreateGrant) {
+    sellerFavoritesCreateGrant.condition = isOwnProfile;
+}
+
+const sellerFavoritesDeleteGrant = rolePermissions[Role.SELLER].grants.find(g => g.action === 'delete:own' && g.resource === 'favorites');
+if (sellerFavoritesDeleteGrant) {
+    sellerFavoritesDeleteGrant.condition = isOwnProfile;
 }
 
 // Apply conditions for ADMIN role
