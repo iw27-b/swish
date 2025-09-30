@@ -1,24 +1,10 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest, JwtPayload } from '@/types';
+import { JwtPayload } from '@/types';
 import { FavoriteQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { isRateLimitedForOperation, recordAttemptForOperation, getAuthenticatedUser } from '@/lib/auth';
 import { Role } from '@prisma/client';
-
-function getAuthenticatedUser(req: NextRequest): JwtPayload | null {
-    const userData = req.headers.get('x-user-data');
-    if (!userData) {
-        return null;
-    }
-
-    try {
-        const parsed = JSON.parse(userData);
-        return parsed;
-    } catch (error) {
-        return null;
-    }
-}
 
 /**
  * Get user's favorite cards with pagination
@@ -31,7 +17,7 @@ export async function GET(
     { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
-        const user = getAuthenticatedUser(req);
+        const user = await getAuthenticatedUser(req);
 
         if (!user) {
             return createErrorResponse('Authentication required', 401);
@@ -124,7 +110,7 @@ export async function POST(
     { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
-        const user = getAuthenticatedUser(req);
+        const user = await getAuthenticatedUser(req);
         if (!user) {
             return createErrorResponse('Authentication required', 401);
         }
@@ -134,7 +120,12 @@ export async function POST(
             return createErrorResponse('Forbidden: You can only manage your own favorites', 403);
         }
 
-        const requestBody = await req.json();
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            return createErrorResponse('Invalid JSON', 400);
+        }
         const { cardId } = requestBody;
 
         if (!cardId || typeof cardId !== 'string') {
@@ -193,7 +184,7 @@ export async function DELETE(
     { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
-        const user = getAuthenticatedUser(req);
+        const user = await getAuthenticatedUser(req);
 
         if (!user) {
             return createErrorResponse('Authentication required', 401);
@@ -255,15 +246,15 @@ export async function DELETE(
             }
         });
 
-        logAuditEvent({
-            action: 'CARD_UNFAVORITED',
-            userId: user.userId,
-            ip: getClientIP(req.headers),
-            userAgent: getUserAgent(req.headers),
-            resource: 'card',
-            resourceId: cardId,
-            timestamp: new Date(),
-        });
+        // logAuditEvent({
+        //     action: 'CARD_UNFAVORITED',
+        //     userId: user.userId,
+        //     ip: getClientIP(req.headers),
+        //     userAgent: getUserAgent(req.headers),
+        //     resource: 'card',
+        //     resourceId: cardId,
+        //     timestamp: new Date(),
+        // });
 
         return createSuccessResponse(
             {

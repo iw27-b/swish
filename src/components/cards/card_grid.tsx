@@ -30,7 +30,7 @@ const CardGrid: React.FC<CardGridProps> = ({ products }) => {
                 const loading = isLoading(cardId);
 
                 return (
-                    <section key={product.id} className="w-full max-w-[285px] relative flex flex-col box-border">
+                    <section key={cardId} className="w-full max-w-[285px] relative flex flex-col box-border">
                         <div
                             className={`absolute top-[15px] right-[10px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer shadow-[0_2px_5px_rgba(0,0,0,0.15)] transition-all duration-300 z-10 ${
                                 loading ? 'opacity-50 cursor-not-allowed' :

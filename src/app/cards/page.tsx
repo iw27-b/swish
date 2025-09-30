@@ -58,6 +58,7 @@ interface ProductItem {
     title: string;
     price: string;
     href?: string;
+    cardId?: string;
 }
 
 const CardsPage: React.FC = () => {
@@ -191,6 +192,7 @@ const CardsPage: React.FC = () => {
         title: `${card.player} - ${card.name}`,
         price: card.price ? `$${card.price.toFixed(2)}` : 'Price on request',
         href: `/cards/${card.id}`,
+        cardId: card.id,
     }));
 
 

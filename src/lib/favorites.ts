@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth, authFetch } from '@/lib/client_auth';
 
 export function useFavorites() {
     const [favorites, setFavorites] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState<Set<string>>(new Set());
+    const loadingRef = useRef<Set<string>>(new Set());
     const { user, isAuthenticated } = useAuth();
     const router = useRouter();
 
@@ -40,9 +41,18 @@ export function useFavorites() {
             return;
         }
 
-        if (!user || loading.has(cardId)) return;
+        if (!user) return;
 
-        setLoading(prev => new Set(prev).add(cardId));
+        if (loadingRef.current.has(cardId)) {
+            return;
+        }
+
+        loadingRef.current.add(cardId);
+        setLoading(prev => {
+            const next = new Set(prev);
+            next.add(cardId);
+            return next;
+        });
 
         try {
             const isFavorited = favorites.has(cardId);
@@ -68,13 +78,14 @@ export function useFavorites() {
         } catch (error) {
             console.error('Error toggling favorite:', error);
         } finally {
+            loadingRef.current.delete(cardId);
             setLoading(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(cardId);
-                return newSet;
+                const next = new Set(prev);
+                next.delete(cardId);
+                return next;
             });
         }
-    }, [favorites, user, isAuthenticated, loading, router]);
+    }, [favorites, user, isAuthenticated, router]);
 
     return {
         favorites,

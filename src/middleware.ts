@@ -2,6 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import { verifyToken, verifyRefreshToken, parseTokenFromCookie } from '@/lib/auth';
 import { hasPermission } from '@/lib/rbac';
 import { JwtPayload } from '@/types';
+import { csrfMiddleware } from '@/middleware/csrf_middleware';
+import { setStrictCorsHeaders } from '@/lib/csrf';
 
 export const ADMIN_ROLE = 'ADMIN';
 
@@ -98,7 +100,8 @@ const ROUTE_RULES: RouteRule[] = [
         resolve: (req, payload) => {
             if (req.method === 'GET') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'read:any' : 'read:own' };
             if (req.method === 'POST') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' };
-            if (req.method === 'PATCH' || req.method === 'DELETE') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'update:any' : 'update:own' };
+            if (req.method === 'PATCH') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'update:any' : 'update:own' };
+            if (req.method === 'DELETE') return { resource: 'trades', action: payload.role === ADMIN_ROLE ? 'delete:any' : 'delete:own' };
             return {};
         }
     },
@@ -127,8 +130,16 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
+    const csrfError = csrfMiddleware(req);
+    if (csrfError) {
+        return csrfError;
+    }
+
     if (method === 'OPTIONS') {
-        return new NextResponse(null, { status: 204 });
+        const response = new NextResponse(null, { status: 204 });
+        const origin = req.headers.get('origin');
+        setStrictCorsHeaders(response, origin, 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+        return response;
     }
 
     const isPublic = PUBLIC_EXACT.has(path) || isPublicCardsGet(path, method);
@@ -156,7 +167,6 @@ export async function middleware(req: NextRequest) {
             const response = NextResponse.json({ success: false, message: 'Invalid or expired token' }, { status: 401 });
             response.cookies.delete('access_token');
             response.cookies.delete('refresh_token');
-            response.cookies.delete('user_data');
             return response;
         }
         const refreshUrl = new URL('/api/auth/refresh', req.url);
@@ -165,25 +175,29 @@ export async function middleware(req: NextRequest) {
     }
 
     const matched = ROUTE_RULES.find(r => r.pattern.test(path));
-    let resource: string | undefined;
-    let action: string | undefined;
-
-    if (matched) {
-        if (matched.methods.length && !matched.methods.includes(method)) {
-            return NextResponse.json({ success: false, message: 'Method Not Allowed' }, { status: 405 });
-        }
-        ({ resource, action } = matched.resolve(req, decodedPayload));
+    if (!matched) {
+        return NextResponse.json({ success: false, message: 'Not Found' }, { status: 404 });
     }
 
-    if (resource && action) {
-        const permitted = hasPermission(decodedPayload.role, resource, action, req, decodedPayload);
-        if (!permitted) {
-            let message = 'Forbidden';
-            if (resource === 'profile' && action.includes(':own')) message = 'Forbidden: profile ownership required';
-            else if (resource === 'favorites' && action.includes(':own')) message = 'Forbidden: favorites ownership required';
-            else if (action.includes(':any') && decodedPayload.role !== ADMIN_ROLE) message = 'Forbidden: admin required';
-            return NextResponse.json({ success: false, message }, { status: 403 });
-        }
+    if (matched.methods.length && !matched.methods.includes(method)) {
+        return NextResponse.json({ success: false, message: 'Method Not Allowed' }, { status: 405 });
+    }
+
+    const resolved = matched.resolve(req, decodedPayload) || {};
+    const resource = resolved.resource;
+    const action = resolved.action;
+
+    if (!resource || !action) {
+        return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
+    }
+
+    const permitted = hasPermission(decodedPayload.role, resource, action, req, decodedPayload);
+    if (!permitted) {
+        let message = 'Forbidden';
+        if (resource === 'profile' && action.includes(':own')) message = 'Forbidden: profile ownership required';
+        else if (resource === 'favorites' && action.includes(':own')) message = 'Forbidden: favorites ownership required';
+        else if (action.includes(':any') && decodedPayload.role !== ADMIN_ROLE) message = 'Forbidden: admin required';
+        return NextResponse.json({ success: false, message }, { status: 403 });
     }
 
     const requestHeaders = new Headers(req.headers);

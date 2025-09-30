@@ -111,12 +111,27 @@ export function hasPermission(
 const isOwnProfile = (req: NextRequest, user: JwtPayload): boolean => {
     const path = req.nextUrl.pathname;
 
-    // /api/users/me should always be allowed for authenticated users
+    const isAuthenticated = !!user && typeof user.userId === 'string' && user.userId.length > 0;
+
     if (path === '/api/users/me') {
-        return true;
+        return isAuthenticated;
     }
 
-    return !!user && typeof user.userId === 'string' && user.userId.length > 0;
+    const match = path.match(/^\/api\/users\/([^\/]+)(?:\/(.+))?$/);
+    if (match) {
+        const targetId = match[1];
+        const subPath = match[2] || '';
+
+        if (subPath.startsWith('favorites')) {
+            return isAuthenticated;
+        }
+
+        if (targetId && targetId !== 'me') {
+            return isAuthenticated && targetId === user.userId;
+        }
+    }
+
+    return isAuthenticated;
 };
 
 const isOwnUserForEmailVerification = (req: NextRequest, user: JwtPayload): boolean => {

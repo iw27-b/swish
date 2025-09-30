@@ -1,10 +1,33 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyPassword, generateToken, generateRefreshToken, isRateLimited, recordFailedAttempt, clearFailedAttempts } from '@/lib/auth';
 import { sanitizeEmail } from '@/lib/api_utils';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
 import { LoginSchema, LoginRequestBody } from '@/types/schemas/auth_schemas';
+import { generateCsrfToken, setCsrfCookie, setStrictCorsHeaders, getAllowedOrigins } from '@/lib/csrf';
+
+/**
+ * Sets CORS headers for cross-origin requests with credentials
+ * Uses strict origin checking for login endpoint
+ * @param response The NextResponse object to add headers to
+ * @param origin The origin header from the request
+ * @returns The response with CORS headers
+ */
+function setCorsHeaders(response: NextResponse, origin?: string | null): NextResponse {
+    setStrictCorsHeaders(response, origin || null, 'POST, OPTIONS');
+    return response;
+}
+
+/**
+ * Handles CORS preflight requests
+ * @param req The Next.js request object
+ * @returns Response with CORS headers
+ */
+export async function OPTIONS(req: NextRequest) {
+    const response = new NextResponse(null, { status: 204 });
+    return setCorsHeaders(response, req.headers.get('origin'));
+}
 
 /**
  * Handles user login with secure HttpOnly cookie authentication
@@ -13,6 +36,7 @@ import { LoginSchema, LoginRequestBody } from '@/types/schemas/auth_schemas';
  */
 export async function POST(req: NextRequest) {
     try {
+        const origin = req.headers.get('origin');
         const clientIP = getClientIP(req.headers);
 
         if (isRateLimited(clientIP)) {
@@ -23,7 +47,8 @@ export async function POST(req: NextRequest) {
                 resource: 'auth',
                 timestamp: new Date(),
             });
-            return createErrorResponse('Too many login attempts. Please try again later.', 429);
+            const response = createErrorResponse('Too many login attempts. Please try again later.', 429);
+            return setCorsHeaders(response, origin);
         }
 
         let requestBody;
@@ -39,12 +64,14 @@ export async function POST(req: NextRequest) {
                 timestamp: new Date(),
                 details: { error: 'Invalid JSON format' },
             });
-            return createErrorResponse('Invalid JSON format in request body', 400);
+            const response = createErrorResponse('Invalid JSON format in request body', 400);
+            return setCorsHeaders(response, origin);
         }
 
         if (!validateRequestSize(requestBody)) {
             recordFailedAttempt(clientIP);
-            return createErrorResponse('Request too large', 413);
+            const response = createErrorResponse('Request too large', 413);
+            return setCorsHeaders(response, origin);
         }
 
         const validationResult = LoginSchema.safeParse(requestBody);
@@ -59,11 +86,12 @@ export async function POST(req: NextRequest) {
                 timestamp: new Date(),
                 details: { errors: validationResult.error.flatten().fieldErrors },
             });
-            return createErrorResponse(
+            const response = createErrorResponse(
                 'Invalid request data',
                 400,
                 validationResult.error.flatten().fieldErrors
             );
+            return setCorsHeaders(response, origin);
         }
 
         const { email, password } = validationResult.data as LoginRequestBody;
@@ -71,7 +99,8 @@ export async function POST(req: NextRequest) {
         const sanitizedEmail = sanitizeEmail(email);
         if (!sanitizedEmail) {
             recordFailedAttempt(clientIP);
-            return createErrorResponse('Invalid email format', 400);
+            const response = createErrorResponse('Invalid email format', 400);
+            return setCorsHeaders(response, origin);
         }
 
         const user = await prisma.user.findUnique({
@@ -88,7 +117,8 @@ export async function POST(req: NextRequest) {
                 timestamp: new Date(),
                 details: { email: sanitizedEmail },
             });
-            return createErrorResponse('Invalid credentials', 401);
+            const response = createErrorResponse('Invalid credentials', 401);
+            return setCorsHeaders(response, origin);
         }
 
         const isPasswordValid = await verifyPassword(user.password, password);
@@ -103,13 +133,15 @@ export async function POST(req: NextRequest) {
                 resource: 'auth',
                 timestamp: new Date(),
             });
-            return createErrorResponse('Invalid credentials', 401);
+            const response = createErrorResponse('Invalid credentials', 401);
+            return setCorsHeaders(response, origin);
         }
 
         clearFailedAttempts(clientIP);
 
         const accessToken = await generateToken(user.id, user.role as Role);
         const refreshToken = await generateRefreshToken(user.id, user.role as Role);
+        const csrfToken = generateCsrfToken();
 
         logAuditEvent({
             action: 'LOGIN_SUCCESS',
@@ -120,47 +152,36 @@ export async function POST(req: NextRequest) {
             timestamp: new Date(),
         });
 
-        // Create minimal response - NO SENSITIVE USER DATA
         const response = createSuccessResponse({
             loginSuccess: true,
+            csrfToken
         }, 'Login successful');
 
-        // Set secure HttpOnly access token cookie
+        const isProduction = process.env.NODE_ENV === 'production';
+
         response.cookies.set('access_token', accessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60, // 15 minutes
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 15 * 60,
             path: '/'
         });
 
-        // Set secure HttpOnly refresh token cookie
         response.cookies.set('refresh_token', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60, // 7 days
+            secure: isProduction,
+            sameSite: isProduction ? 'none' : 'lax',
+            maxAge: 7 * 24 * 60 * 60,
             path: '/'
         });
 
-        // Set minimal user data cookie for client-side access (ONLY safe, non-sensitive data)
-        response.cookies.set('user_data', JSON.stringify({
-            id: user.id,                    // Safe: Just an identifier
-            name: user.name,                // Safe: Display name
-            role: user.role,                // Safe: Needed for UI permissions
-            isEmailVerified: user.emailVerified  // Safe: UI state only
-        }), {
-            httpOnly: false, // Accessible to client for UI purposes
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60, // Same as access token
-            path: '/'
-        });
+        setCsrfCookie(response, csrfToken, isProduction);
 
-        return response;
+        return setCorsHeaders(response, origin);
 
     } catch (error) {
         console.error('Login error:', error);
-        return createErrorResponse('Internal server error', 500);
+        const response = createErrorResponse('Internal server error', 500);
+        return setCorsHeaders(response, req.headers.get('origin'));
     }
 } 
