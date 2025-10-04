@@ -37,8 +37,9 @@ export function useAuth(): AuthState & {
 
     const getCurrentUser = async () => {
         try {
-            const response = await authFetch('/api/users/me', {
-                method: 'GET',
+            const response = await authFetch('/api/users/me', { 
+                method: 'GET', 
+                credentials: 'include' 
             });
 
             if (response.ok) {
@@ -69,7 +70,6 @@ export function useAuth(): AuthState & {
             const data = await response.json();
 
             if (data.success) {
-                // Get user data after successful login
                 await getCurrentUser();
                 return { success: true, message: 'Login successful' };
             } else {
@@ -85,9 +85,8 @@ export function useAuth(): AuthState & {
 
     const logout = async () => {
         try {
-            await fetch('/api/auth/logout', {
+            await authFetch('/api/auth/logout', {
                 method: 'POST',
-                credentials: 'include',
             });
         } catch (error) {
             console.error('Logout error:', error);
@@ -192,20 +191,59 @@ export function withRoleRequired<P extends object>(
 }
 
 /**
- * Simple authenticated fetch wrapper
- * Automatically handles 401s and token refresh
+ * Gets CSRF token from cookie
+ */
+function getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    
+    const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+    const csrfCookie = cookies.find(cookie => cookie.startsWith('csrf_token='));
+    
+    if (csrfCookie) {
+        return csrfCookie.substring('csrf_token='.length);
+    }
+    
+    return null;
+}
+
+/**
+ * Authenticated fetch wrapper with CSRF protection
+ * Automatically handles 401s, token refresh, and CSRF tokens
  */
 export async function authFetch(
     url: string,
     options: RequestInit = {}
 ): Promise<Response> {
+    const method = options.method?.toUpperCase() || 'GET';
+    const isStateChanging = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    
+    const headers: Record<string, string> = {
+        ...(options.headers as Record<string, string> || {}),
+    };
+    
+    const hasContentType = Object.keys(headers).some(
+        key => key.toLowerCase() === 'content-type'
+    );
+    
+    if (!hasContentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    
+    if (isStateChanging) {
+        const csrfToken = getCsrfToken();
+        if (csrfToken) {
+            headers['X-CSRF-Token'] = csrfToken;
+        } else {
+            console.warn('[authFetch] No CSRF token found for state-changing request:', { url, method });
+        }
+    }
+    
+    const { headers: _, ...restOptions } = options;
+    
     const defaultOptions: RequestInit = {
         credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers,
-        },
-        ...options,
+        ...restOptions,
+        headers,
     };
 
     let response = await fetch(url, defaultOptions);
@@ -217,12 +255,20 @@ export async function authFetch(
         });
 
         if (refreshResponse.ok) {
+            if (isStateChanging) {
+                const csrfToken = getCsrfToken();
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                }
+            }
+            defaultOptions.headers = headers;
             response = await fetch(url, defaultOptions);
         }
     }
 
     return response;
 }
+
 
 /**
  * Hook for API calls with automatic auth handling

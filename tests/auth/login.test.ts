@@ -3,17 +3,16 @@ import { POST as loginUser } from '@/app/api/auth/login/route';
 import prisma from '@/lib/prisma';
 import { NextRequest } from 'next/server';
 import { DeepMockProxy } from 'vitest-mock-extended';
-import * as edgeAuthUtils from '@/lib/edge_auth_utils';
-import * as passwordUtils from '@/lib/password_utils';
+import * as authUtils from '@/lib/auth';
 import { Role } from '@prisma/client';
 
-vi.mock('@/lib/password_utils', () => ({
+vi.mock('@/lib/auth', () => ({
     verifyPassword: vi.fn(),
-}));
-
-vi.mock('@/lib/edge_auth_utils', () => ({
-    generateEdgeToken: vi.fn(),
-    generateEdgeRefreshToken: vi.fn(),
+    generateToken: vi.fn(),
+    generateRefreshToken: vi.fn(),
+    isRateLimited: vi.fn(() => false),
+    recordFailedAttempt: vi.fn(),
+    clearFailedAttempts: vi.fn(),
 }));
 
 const prismaMock = prisma as unknown as DeepMockProxy<typeof prisma>;
@@ -47,14 +46,15 @@ const mockUser = {
 describe('POST /api/auth/login', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        (passwordUtils.verifyPassword as any).mockReset();
-        (edgeAuthUtils.generateEdgeToken as any).mockResolvedValue('mocked.jwt.token');
-        (edgeAuthUtils.generateEdgeRefreshToken as any).mockResolvedValue('mocked.refresh.token');
+        (authUtils.verifyPassword as any).mockReset();
+        (authUtils.generateToken as any).mockResolvedValue('mocked.jwt.token');
+        (authUtils.generateRefreshToken as any).mockResolvedValue('mocked.refresh.token');
+        (authUtils.isRateLimited as any).mockReturnValue(false);
     });
 
     it('should login a user and return a token successfully', async () => {
         prismaMock.user.findUnique.mockResolvedValue(mockUser);
-        (passwordUtils.verifyPassword as any).mockResolvedValue(true);
+        (authUtils.verifyPassword as any).mockResolvedValue(true);
 
         const req = new NextRequest('http://localhost:3000/api/auth/login', {
             method: 'POST',
@@ -72,12 +72,14 @@ describe('POST /api/auth/login', () => {
         expect(body.success).toBe(true);
         expect(body.message).toBe('Login successful');
         expect(body.data.loginSuccess).toBe(true);
+        expect(body.data.csrfToken).toBeDefined();
+        expect(typeof body.data.csrfToken).toBe('string');
+        expect(body.data.csrfToken.length).toBeGreaterThan(0);
         
-        // Check cookies are set
         const cookies = response.headers.get('set-cookie');
         expect(cookies).toContain('access_token=');
         expect(cookies).toContain('refresh_token=');
-        expect(cookies).toContain('user_data=');
+        expect(cookies).toContain('csrf_token=');
     });
 
     it('should return 401 for non-existent user', async () => {
@@ -102,7 +104,7 @@ describe('POST /api/auth/login', () => {
 
     it('should return 401 for incorrect password', async () => {
         prismaMock.user.findUnique.mockResolvedValue(mockUser);
-        (passwordUtils.verifyPassword as any).mockResolvedValue(false);
+        (authUtils.verifyPassword as any).mockResolvedValue(false);
 
         const req = new NextRequest('http://localhost:3000/api/auth/login', {
             method: 'POST',

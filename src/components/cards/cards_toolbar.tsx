@@ -74,15 +74,15 @@ const CardsToolbar: React.FC<CardsToolbarProps> = ({
     };
 
     const handlePriceApply = () => {
-        const min = parseFloat(minPrice) || 0;
-        const max = parseFloat(maxPrice) || 1100100;
+        const min = parseFloat(minPrice.replace(/,/g, '')) || 0;
+        const max = parseFloat(maxPrice.replace(/,/g, '')) || 1100100;
         onPriceRangeChange?.(min, max);
         setPriceDropdownOpen(false);
     };
 
     const getPriceButtonText = () => {
-        const min = parseFloat(minPrice) || 0;
-        const max = parseFloat(maxPrice) || 1100100;
+        const min = parseFloat(minPrice.replace(/,/g, '')) || 0;
+        const max = parseFloat(maxPrice.replace(/,/g, '')) || 1100100;
         if (min === 0 && max >= 1100100) {
             return '金額';
         }
@@ -234,10 +234,15 @@ const CardsToolbar: React.FC<CardsToolbarProps> = ({
                                 </div>
                                 <div className="flex gap-2">
                                     <button
-                                        onClick={() => setPriceDropdownOpen(false)}
+                                        onClick={() => {
+                                            setMinPrice('0.00');
+                                            setMaxPrice('1,100,100.00');
+                                            onPriceRangeChange?.(0, 1100100);
+                                            setPriceDropdownOpen(false);
+                                        }}
                                         className="flex-1 px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
                                     >
-                                        キャンセル
+                                        リセット
                                     </button>
                                     <button
                                         onClick={handlePriceApply}

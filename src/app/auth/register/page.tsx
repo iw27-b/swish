@@ -75,7 +75,7 @@ export default function RegisterPage(): React.ReactElement {
 
     return (
         <main className="min-h-screen bg-[#f0f0f1] text-[#111]">
-            <Link href="/" className="fixed top-[18px] left-[28px] z-10 text-2xl font-black tracking-tight">Swish</Link>
+            <Link href="/" className="fixed top-[18px] left-[28px] z-10 text-2xl font-black tracking-tight">SWISH</Link>
             <div className="min-h-screen flex items-center justify-center gap-4 px-4 pt-[60px] pb-10">
                 {/* 左侧插画 */}
                 <section className="flex items-center justify-center min-h-[320px] flex-[0_1_500px]">
@@ -90,7 +90,7 @@ export default function RegisterPage(): React.ReactElement {
                 {/* 右侧卡片 */}
                 <section className="flex-[0_0_520px] bg-white rounded-[22px] p-8 border-0 shadow-none ml-[-6px]">
                     <div className="flex items-center justify-between text-[#6b7280] text-[14px] mb-2.5">
-                        <span>ようこそ SWICH</span>
+                        <span>ようこそ SWISH</span>
                         <span>
                             アカウントがあります？ <Link href="/auth/login" className="text-[#0a58ff] hover:underline">ログイン</Link>
                         </span>

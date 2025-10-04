@@ -25,16 +25,25 @@ This document provides a comprehensive overview of all API endpoints in the Swis
 
 ## Authentication
 Most routes require authentication via HttpOnly cookies set during login:
-- `access_token` - 15 minute expiry
-- `refresh_token` - 7 day expiry  
-- `user_data` - Non-sensitive user info for client
+- `access_token` - 15 minute expiry, HttpOnly, Secure, SameSite=None (production) / SameSite=Lax (development)
+- `refresh_token` - 7 day expiry, HttpOnly, Secure, SameSite=None (production) / SameSite=Lax (development)
+- `csrf_token` - 15 minute expiry, JavaScript-readable, Secure, SameSite=None (production) / SameSite=Lax (development)
+
+**User Profile Data:** To retrieve user profile information, use the authenticated `GET /api/users/me` endpoint. User data is NOT exposed via cookies for security reasons.
+
+**CSRF Protection:** All state-changing requests (POST, PUT, PATCH, DELETE) require a valid CSRF token in the `X-CSRF-Token` header that matches the `csrf_token` cookie. The CSRF token is issued during login and token refresh.
+
+**CORS Support:** All authentication endpoints support cross-origin requests with credentials from trusted origins only. The client must:
+1. Include `credentials: 'include'` in fetch requests
+2. Send the `X-CSRF-Token` header with the token value from the response body or cookie for all state-changing requests
+3. Originate from an allowed origin (localhost:3000, localhost:3001, or production domain)
 
 ---
 
 ## Authentication Endpoints
 
 ### POST `/api/auth/login`
-**Description:** User login with secure cookie authentication
+**Description:** User login with secure cookie authentication and CSRF token issuance
 
 **Request Body:**
 ```json
@@ -49,13 +58,14 @@ Most routes require authentication via HttpOnly cookies set during login:
 {
   "success": true,
   "data": {
-    "loginSuccess": true
+    "loginSuccess": true,
+    "csrfToken": "a1b2c3d4e5f6..."
   },
   "message": "Login successful"
 }
 ```
 
-Sets secure HttpOnly cookies for authentication.
+Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF token cookie. The CSRF token is also returned in the response body for client-side storage.
 
 ### POST `/api/auth/register`
 **Description:** Create new user account
@@ -101,6 +111,30 @@ Sets secure HttpOnly cookies for authentication.
   "message": "Logged out successfully"
 }
 ```
+
+### POST `/api/auth/refresh`
+**Description:** Refresh access token using HttpOnly refresh token cookie
+**Authentication:** Requires valid refresh token cookie
+
+**Request Body:** None (uses refresh token from cookie)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "csrfToken": "a1b2c3d4e5f6..."
+  },
+  "message": "Token refreshed successfully"
+}
+```
+
+**Features:**
+- Automatically sets new access token and CSRF token cookies
+- Returns new CSRF token in response body
+- Supports CORS with credentials for cross-origin requests from trusted origins only
+- Uses proper SameSite cookie attributes (none for production, lax for development)
+- Includes proper CORS headers for preflight requests
 
 ### POST `/api/auth/change-password`
 **Description:** Change user password (requires PIN if set)
@@ -991,10 +1025,11 @@ Rate limit headers are included in responses:
 
 ## Security Features
 
+- **CSRF Protection** - Double-submit cookie pattern with server-side validation for all state-changing requests
+- **Strict CORS** - Origin validation restricting state-changing endpoints to trusted origins only
 - **Argon2id password hashing** - Industry-leading password security
 - **Audit logging** - All security events tracked
 - **PIN protection** - Additional security for sensitive operations
 - **Input validation** - Comprehensive request validation
 - **Request size limits** - Protection against oversized payloads
-- **CORS protection** - Cross-origin request security
-- **Secure cookies** - HttpOnly, Secure, SameSite cookies
+- **Secure cookies** - HttpOnly, Secure, SameSite cookies with appropriate scope

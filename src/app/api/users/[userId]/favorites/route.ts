@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
+import { JwtPayload } from '@/types';
 import { FavoriteQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { isRateLimitedForOperation, recordAttemptForOperation, getAuthenticatedUser } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
@@ -13,18 +13,19 @@ import { Role } from '@prisma/client';
  * @returns JSON response with favorites list or error
  */
 export async function GET(
-    req: AuthenticatedRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
-        if (!req.user) {
+        const user = await getAuthenticatedUser(req);
+
+        if (!user) {
             return createErrorResponse('Authentication required', 401);
         }
 
         const { userId } = await params;
-        const requestingUser = req.user;
 
-        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
+        if (user.userId !== userId && user.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only view your own favorites', 403);
         }
 
@@ -71,7 +72,7 @@ export async function GET(
 
         logAuditEvent({
             action: 'USER_FAVORITES_VIEWED',
-            userId: requestingUser.userId,
+            userId: user.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'user',
@@ -105,19 +106,94 @@ export async function GET(
  * @returns JSON response with success message or error
  */
 export async function POST(
-    req: AuthenticatedRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ userId: string }> }
 ) {
     try {
-        if (!req.user) {
+        const user = await getAuthenticatedUser(req);
+        if (!user) {
             return createErrorResponse('Authentication required', 401);
         }
 
         const { userId } = await params;
-        const requestingUser = req.user;
+        if (user.userId !== userId) {
+            return createErrorResponse('Forbidden: You can only manage your own favorites', 403);
+        }
+
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            return createErrorResponse('Invalid JSON', 400);
+        }
+        const { cardId } = requestBody;
+
+        if (!cardId || typeof cardId !== 'string') {
+            return createErrorResponse('Card ID is required', 400);
+        }
+
+        const card = await prisma.card.findUnique({
+            where: { id: cardId }
+        });
+
+        if (!card) {
+            return createErrorResponse('Card not found', 404);
+        }
+
+        const existingFavorite = await prisma.cardFavorite.findUnique({
+            where: {
+                userId_cardId: { userId, cardId }
+            }
+        });
+
+        if (existingFavorite) {
+            return createErrorResponse('Card is already in favorites', 409);
+        }
+
+        const favorite = await prisma.cardFavorite.create({
+            data: { userId, cardId },
+            include: {
+                card: {
+                    select: {
+                        id: true,
+                        name: true,
+                        player: true,
+                        imageUrl: true,
+                        price: true
+                    }
+                }
+            }
+        });
+
+        return createSuccessResponse(favorite, 'Card added to favorites successfully');
+
+    } catch (error) {
+        console.error('Add favorite error:', error);
+        return createErrorResponse('Internal server error', 500);
+    }
+}
+
+/**
+ * Remove a card from favorites
+ * @param req AuthenticatedRequest - The authenticated request
+ * @param params - The user ID
+ * @returns JSON response with success message or error
+ */
+export async function DELETE(
+    req: NextRequest,
+    { params }: { params: Promise<{ userId: string }> }
+) {
+    try {
+        const user = await getAuthenticatedUser(req);
+
+        if (!user) {
+            return createErrorResponse('Authentication required', 401);
+        }
+
+        const { userId } = await params;
         const clientIP = getClientIP(req.headers);
 
-        if (requestingUser.userId !== userId) {
+        if (user.userId !== userId) {
             return createErrorResponse('Forbidden: You can only manage your own favorites', 403);
         }
 
@@ -139,16 +215,29 @@ export async function POST(
             return createErrorResponse('Card ID is required', 400);
         }
 
-        const card = await prisma.card.findUnique({
-            where: { id: cardId },
-            select: { id: true, name: true, player: true }
+        const existingFavorite = await prisma.cardFavorite.findUnique({
+            where: {
+                userId_cardId: {
+                    userId,
+                    cardId
+                }
+            },
+            include: {
+                card: {
+                    select: {
+                        id: true,
+                        name: true,
+                        player: true
+                    }
+                }
+            }
         });
 
-        if (!card) {
-            return createErrorResponse('Card not found', 404);
+        if (!existingFavorite) {
+            return createErrorResponse('Card is not in favorites', 404);
         }
 
-        const existingFavorite = await prisma.cardFavorite.findUnique({
+        await prisma.cardFavorite.delete({
             where: {
                 userId_cardId: {
                     userId,
@@ -157,42 +246,26 @@ export async function POST(
             }
         });
 
-        if (existingFavorite) {
-            return createErrorResponse('Card is already in favorites', 409);
-        }
+        // logAuditEvent({
+        //     action: 'CARD_UNFAVORITED',
+        //     userId: user.userId,
+        //     ip: getClientIP(req.headers),
+        //     userAgent: getUserAgent(req.headers),
+        //     resource: 'card',
+        //     resourceId: cardId,
+        //     timestamp: new Date(),
+        // });
 
-        const favorite = await prisma.cardFavorite.create({
-            data: {
-                userId,
-                cardId
+        return createSuccessResponse(
+            {
+                cardId,
+                card: existingFavorite.card
             },
-            include: {
-                card: {
-                    select: {
-                        id: true,
-                        name: true,
-                        player: true,
-                        imageUrl: true,
-                        price: true
-                    }
-                }
-            }
-        });
-
-        logAuditEvent({
-            action: 'CARD_FAVORITED',
-            userId: requestingUser.userId,
-            ip: getClientIP(req.headers),
-            userAgent: getUserAgent(req.headers),
-            resource: 'card',
-            resourceId: cardId,
-            timestamp: new Date(),
-        });
-
-        return createSuccessResponse(favorite, 'Card added to favorites successfully');
+            'Card removed from favorites successfully'
+        );
 
     } catch (error) {
-        console.error('Add favorite error:', error);
+        console.error('Remove favorite error:', error);
         return createErrorResponse('Internal server error', 500);
     }
 } 

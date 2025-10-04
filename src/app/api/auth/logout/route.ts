@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
+import { deleteCsrfCookie } from '@/lib/csrf';
 
 /**
  * Handles user logout by clearing all authentication cookies
@@ -46,13 +47,7 @@ export async function POST(req: AuthenticatedRequest) {
             path: '/'
         });
 
-        response.cookies.set('user_data', '', {
-            httpOnly: false,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 0,
-            path: '/'
-        });
+        deleteCsrfCookie(response);
 
         return response;
 
