@@ -295,7 +295,7 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 ```
 
 ### GET `/api/users/me`
-**Description:** Get current user's complete profile
+**Description:** Get current user's complete profile including saved payment methods metadata
 **Authentication:** Required
 
 **Response:**
@@ -310,11 +310,24 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
     "emailVerified": true,
     "phoneNumber": "+1234567890",
     "bio": "Basketball card collector",
+    "paymentMethods": [
+      {
+        "id": "card_1234567890_abc",
+        "cardBrand": "visa",
+        "last4": "4242",
+        "expiryMonth": "12",
+        "expiryYear": "25",
+        "nickname": "Main Card",
+        "createdAt": "2024-01-01T00:00:00.000Z"
+      }
+    ],
     "hasSecurityPin": true
   },
   "message": "Complete profile retrieved successfully"
 }
 ```
+
+**Note:** Payment methods only return metadata (last4, brand, expiry, nickname). Full card details are encrypted and never exposed to the frontend.
 
 ### PATCH `/api/users/me`
 **Description:** Update current user's profile (PIN required for sensitive fields)
@@ -392,6 +405,121 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
   "message": "Followers retrieved successfully"
 }
 ```
+
+---
+
+## Payment Methods
+
+### GET `/api/users/me/payment-methods`
+**Description:** Retrieve all payment method metadata for current user
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "card_1234567890_abc",
+      "cardBrand": "visa",
+      "last4": "4242",
+      "expiryMonth": "12",
+      "expiryYear": "25",
+      "nickname": "Main Card",
+      "createdAt": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "message": "Payment methods retrieved successfully"
+}
+```
+
+**Security Notes:**
+- Only returns metadata (last4, brand, expiry, nickname)
+- Full card numbers are encrypted with AES-256-GCM and never exposed to frontend
+- Card data is encrypted at rest in the database
+
+### POST `/api/users/me/payment-methods`
+**Description:** Add a new payment method (encrypted and stored securely)
+**Authentication:** Required
+**CSRF Protection:** Required
+
+**Request Body:**
+```json
+{
+  "paymentMethods": [
+    {
+      "id": "card_1234567890_abc",
+      "cardNumber": "4242424242424242",
+      "expiryMonth": "12",
+      "expiryYear": "25",
+      "cardholderName": "John Doe",
+      "cardBrand": "visa",
+      "last4": "4242",
+      "nickname": "Main Card"
+    }
+  ],
+  "securityPin": "1234"  // Required if user has set a security PIN
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "card_1234567890_abc",
+    "cardBrand": "visa",
+    "last4": "4242",
+    "expiryMonth": "12",
+    "expiryYear": "25",
+    "nickname": "Main Card",
+    "createdAt": "2024-01-01T00:00:00.000Z"
+  },
+  "message": "Payment method added successfully"
+}
+```
+
+**Error Responses:**
+- `400` - Invalid payment method data
+- `409` - Card already exists (detected via fingerprint)
+- `403` - Security PIN required but not provided or incorrect
+
+**Security Features:**
+- Card numbers are encrypted with AES-256-GCM before storage
+- Uses fingerprinting to detect duplicate cards without decrypting
+- Requires security PIN if user has one set
+- Full card details are never returned to frontend
+- CVV is never stored (only used for transaction processing)
+
+### DELETE `/api/users/me/payment-methods/[id]`
+**Description:** Remove a specific payment method
+**Authentication:** Required
+**CSRF Protection:** Required
+
+**Parameters:**
+- `id` (URL parameter): Payment method ID to delete
+
+**Request Body:**
+```json
+{
+  "securityPin": "1234"  // Required if user has set a security PIN
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": null,
+  "message": "Payment method removed successfully"
+}
+```
+
+**Error Responses:**
+- `404` - Payment method not found
+- `403` - Security PIN required but not provided or incorrect
+
+---
 
 ### GET `/api/users/[userId]/favorites`
 **Description:** Get user's favorite cards
@@ -867,6 +995,235 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 
 ---
 
+## Cart & Checkout
+
+### GET `/api/cart`
+**Description:** Get user's shopping cart with all items
+**Authentication:** Required
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cart_id",
+    "itemCount": 3,
+    "totalPrice": 305.87,
+    "items": [
+      {
+        "id": "cart_item_id",
+        "cardId": "card_id",
+        "addedAt": "2024-01-01T00:00:00.000Z",
+        "card": {
+          "id": "card_id",
+          "name": "2020 Lamelo Ball Sensational Auto",
+          "player": "Lamelo Ball",
+          "team": "Charlotte Hornets",
+          "price": 34.99,
+          "imageUrl": "https://...",
+          "owner": {
+            "id": "owner_id",
+            "name": "Card Owner"
+          }
+        }
+      }
+    ],
+    "updatedAt": "2024-01-01T00:00:00.000Z"
+  },
+  "message": "Cart retrieved successfully"
+}
+```
+
+### POST `/api/cart`
+**Description:** Add a card to user's shopping cart
+**Authentication:** Required
+**CSRF Protection:** Required
+
+**Request Body:**
+```json
+{
+  "cardId": "card_id_123"
+}
+```
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cart_item_id",
+    "cartId": "cart_id",
+    "cardId": "card_id_123",
+    "addedAt": "2024-01-01T00:00:00.000Z",
+    "card": {
+      "id": "card_id_123",
+      "name": "2020 Lamelo Ball Auto",
+      "player": "Lamelo Ball",
+      "price": 34.99,
+      "imageUrl": "https://...",
+      "owner": {
+        "id": "owner_id",
+        "name": "Card Owner"
+      }
+    }
+  },
+  "message": "Card added to cart successfully"
+}
+```
+
+**Response (Error - Card already in cart):**
+```json
+{
+  "success": false,
+  "error": "Card is already in your cart"
+}
+```
+
+**Features:**
+- Validates card is for sale and available
+- Prevents adding your own cards to cart
+- Prevents adding already sold cards
+- Automatic cart creation if user doesn't have one
+- Duplicate prevention (can't add same card twice)
+
+### POST `/api/cart/checkout`
+**Description:** Complete checkout for all items in user's cart with FCFS collision handling
+**Authentication:** Required
+**CSRF Protection:** Required
+
+**Request Body (Saved Payment Method):**
+```json
+{
+  "paymentMethodId": "pm_abc123_encrypted_id",
+  "cvv": "123",
+  "shippingAddress": {
+    "name": "John Doe",
+    "phone": "+81-90-1234-5678",
+    "streetAddress": "123 Main St, Apt 4",
+    "city": "Tokyo",
+    "state": "Shibuya",
+    "postalCode": "150-0001",
+    "country": "Japan"
+  },
+  "notes": "Optional delivery instructions"
+}
+```
+
+**Request Body (One-Time Payment):**
+```json
+{
+  "oneTimePayment": {
+    "cardNumber": "4111111111111111",
+    "expiryMonth": "12",
+    "expiryYear": "2025",
+    "cvv": "123",
+    "cardholderName": "John Doe",
+    "cardBrand": "visa"
+  },
+  "shippingAddress": {
+    "name": "John Doe",
+    "phone": "+81-90-1234-5678",
+    "streetAddress": "123 Main St, Apt 4",
+    "city": "Tokyo",
+    "state": "Shibuya",
+    "postalCode": "150-0001",
+    "country": "Japan"
+  },
+  "notes": "Optional delivery instructions"
+}
+```
+
+**Note:** 
+- **Saved Payment Method**: Use `paymentMethodId` with `cvv` for saved cards
+  - `paymentMethodId` is the ID of a saved payment method (returned from `/api/users/me/payment-methods`)
+  - `cvv` is required and validated against the stored CVV hash
+  - The CVV is hashed using SHA-256 and stored with the payment method for validation during checkout
+- **One-Time Payment**: Use `oneTimePayment` object for guest/temporary card usage
+  - Card details are NOT stored in the database
+  - Used for users who don't want to save their card information
+  - All fields in `oneTimePayment` are required
+- Either `paymentMethodId` OR `oneTimePayment` must be provided (not both)
+- `phone` is optional in the shipping address
+
+**Security:**
+- **Saved Methods**: CVV is never stored in plaintext; only a SHA-256 hash is kept for validation
+- **One-Time Payments**: Card data is never persisted to the database
+- CVV verification occurs before payment processing
+- Invalid CVV will result in a 400 error and increment the rate limit counter
+- One-time payment details are only used for the current transaction and immediately discarded
+
+**Response (Success):**
+```json
+{
+  "success": true,
+  "data": {
+    "purchases": [
+      {
+        "id": "purchase_id",
+        "cardId": "card_id",
+        "amount": 34.99,
+        "status": "PENDING",
+        "shippingAddress": { /* address details */ },
+        "purchasedAt": "2024-01-01T00:00:00.000Z"
+      }
+    ],
+    "totalAmount": 305.87,
+    "failedItems": []
+  },
+  "message": "Checkout completed successfully. All items purchased."
+}
+```
+
+**Response (Partial Success - Some items unavailable):**
+```json
+{
+  "success": true,
+  "data": {
+    "purchases": [
+      { /* successful purchase */ }
+    ],
+    "totalAmount": 199.99,
+    "failedItems": [
+      {
+        "cardId": "card_id_2",
+        "reason": "Card already sold"
+      }
+    ]
+  },
+  "message": "Checkout completed with 1 item(s) unavailable."
+}
+```
+
+**Features:**
+- First-Come-First-Served (FCFS) collision handling for sold items
+- Automatic removal of unavailable items from cart
+- Validation that cards are for sale and owned by other users
+- Mock payment validation (can be replaced with real payment processor)
+- Shipping address validation and storage
+- Rate limiting to prevent abuse
+- Comprehensive audit logging for all purchases
+- **Email Notifications**: Sends order confirmation emails to buyers upon successful purchase
+
+**Email Notifications:**
+- Automatically sends HTML order confirmation emails on successful purchase
+- Email includes order ID, purchased items, pricing breakdown, and shipping address
+- Requires SMTP configuration in `.env` file (see Environment Variables section)
+- If SMTP is not configured, checkout will complete successfully but email will be skipped
+- Server logs show email sending status and SMTP server responses
+- Falls back gracefully if email sending fails (purchase still completes)
+
+**Checkout Page:** `/checkout`
+**Description:** Frontend checkout page with two-column layout, payment methods, shipping address management, order review, and confirmation modal
+
+**Features:**
+- Address modal for entering/editing shipping information
+- Payment modal for adding credit/debit cards
+- Order summary with pricing breakdown (USD and JPY)
+- Privacy terms acceptance checkbox
+- Real-time cart validation
+- Confirmation modal upon successful purchase
+- Responsive design with sticky order summary
+
 ## Purchases
 
 ### GET `/api/purchases`
@@ -1020,6 +1377,43 @@ Rate limit headers are included in responses:
 - `X-RateLimit-Limit`: Request limit
 - `X-RateLimit-Remaining`: Remaining requests
 - `X-RateLimit-Reset`: Reset timestamp
+
+---
+
+## Environment Variables
+
+### SMTP Configuration (Email Notifications)
+
+The following environment variables are required to enable email notifications for order confirmations and other transactional emails:
+
+```env
+SMTP_HOST=smtp.gmail.com                    # SMTP server hostname
+SMTP_PORT=587                               # SMTP server port (587 for TLS, 465 for SSL)
+SMTP_SECURE=false                           # true for port 465 (SSL), false for other ports (TLS)
+SMTP_USER=your-email@gmail.com             # SMTP authentication username
+SMTP_PASS=your-app-password                # SMTP authentication password
+SMTP_FROM=noreply@swish.com                # (Optional) Sender email address (defaults to SMTP_USER)
+```
+
+**Notes:**
+- If SMTP variables are not configured, the application will log a warning message to the console and skip email sending
+- Email sending failures are gracefully handled and logged to the console
+- Order processing will complete successfully even if email sending fails
+- Server logs display SMTP connection status and email sending responses
+
+**Gmail Configuration Example:**
+1. Enable 2-factor authentication on your Gmail account
+2. Generate an App Password from Google Account settings
+3. Use the App Password (16 characters without spaces) as `SMTP_PASS`
+4. Set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`
+
+**Console Logging:**
+- `[SMTP] SMTP not configured.` - SMTP environment variables not set
+- `[SMTP] Configured successfully: hostname:port` - SMTP initialized successfully
+- `[SMTP] Email sent successfully to [recipient]` - Email delivered successfully
+- `[SMTP] Message ID: [id]` - Email message identifier
+- `[SMTP] Response: [response]` - SMTP server response code (e.g., 250 OK)
+- `[SMTP] Failed to send email: [error]` - Email sending failed with error details
 
 ---
 

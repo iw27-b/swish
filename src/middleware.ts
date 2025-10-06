@@ -47,6 +47,16 @@ const ROUTE_RULES: RouteRule[] = [
         resolve: (req, payload) => ({ resource: 'profile', action: req.method === 'GET' ? 'read:own' : 'update:own' })
     },
     {
+        pattern: /^\/api\/users\/me\/payment-methods$/,
+        methods: ['GET', 'POST'],
+        resolve: (req, payload) => ({ resource: 'payment_methods', action: req.method === 'GET' ? 'read:own' : 'create:own' })
+    },
+    {
+        pattern: /^\/api\/users\/me\/payment-methods\/([^/]+)$/,
+        methods: ['DELETE'],
+        resolve: (req, payload) => ({ resource: 'payment_methods', action: 'delete:own' })
+    },
+    {
         pattern: /^\/api\/users\/([^/]+)$/,
         methods: ['GET', 'PATCH', 'DELETE'],
         resolve: (req, payload) => {
@@ -119,6 +129,16 @@ const ROUTE_RULES: RouteRule[] = [
         pattern: /^\/api\/cart\/checkout$/,
         methods: ['POST'],
         resolve: (req, payload) => ({ resource: 'purchases', action: payload.role === ADMIN_ROLE ? 'create:any' : 'create:own' })
+    },
+    {
+        pattern: /^\/api\/cart(\/.*)?$/,
+        methods: ['GET', 'POST', 'DELETE'],
+        resolve: (req, payload) => {
+            if (req.method === 'GET') return { resource: 'cart', action: 'read:own' };
+            if (req.method === 'POST') return { resource: 'cart', action: 'create:own' };
+            if (req.method === 'DELETE') return { resource: 'cart', action: 'delete:own' };
+            return {};
+        }
     }
 ];
 
@@ -148,6 +168,8 @@ export async function middleware(req: NextRequest) {
     }
 
     let accessToken = parseTokenFromCookie(req.headers.get('cookie'), 'access_token');
+    // console.log(`[Middleware] ${method} ${path} - Access token found:`, !!accessToken);
+    
     if (!accessToken) {
         const authHeader = req.headers.get('authorization');
         if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -156,6 +178,7 @@ export async function middleware(req: NextRequest) {
     }
 
     if (!accessToken) {
+        // console.log(`[Middleware] ${method} ${path} - No access token, returning 401`);
         return NextResponse.json({ success: false, message: 'Authentication required' }, { status: 401 });
     }
 

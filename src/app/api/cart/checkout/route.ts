@@ -2,15 +2,35 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { isRateLimitedForOperation, recordAttemptForOperation, withAuth } from '@/lib/auth';
+import { verifyCvv } from '@/lib/payment_methods';
+import { EncryptedPaymentMethod, PaymentMethodMetadata } from '@/types/schemas/payment_schemas';
+import { sendEmail } from '@/lib/smtp';
+import { generateOrderConfirmationEmail, generateOrderConfirmationText } from '@/lib/email_templates';
 import { z } from 'zod';
+
+const OneTimePaymentSchema = z.object({
+    cardNumber: z.string().min(13).max(19),
+    expiryMonth: z.string().min(1).max(2),
+    expiryYear: z.string().min(2).max(4),
+    cvv: z.string().min(3).max(4),
+    cardholderName: z.string().min(1).max(100),
+    cardBrand: z.string().min(1).max(50),
+});
 
 const CheckoutSchema = z.object({
     paymentMethodId: z.string()
         .min(1, { message: 'Payment method is required' })
-        .max(50, { message: 'Payment method ID too long' }),
+        .max(50, { message: 'Payment method ID too long' })
+        .optional(),
+    cvv: z.string()
+        .min(3, { message: 'CVV must be at least 3 digits' })
+        .max(4, { message: 'CVV must be at most 4 digits' })
+        .optional(),
+    oneTimePayment: OneTimePaymentSchema.optional(),
     shippingAddress: z.object({
         name: z.string().min(1).max(100),
+        phone: z.string().optional(),
         streetAddress: z.string().min(1).max(200),
         city: z.string().min(1).max(100),
         state: z.string().min(1).max(100),
@@ -20,7 +40,10 @@ const CheckoutSchema = z.object({
     notes: z.string()
         .max(500, { message: 'Notes must be less than 500 characters' })
         .optional(),
-});
+}).refine(
+    (data) => data.paymentMethodId || data.oneTimePayment,
+    { message: 'Either paymentMethodId or oneTimePayment must be provided' }
+);
 
 type CheckoutRequestBody = z.infer<typeof CheckoutSchema>;
 
@@ -54,16 +77,13 @@ async function mockPaymentValidation(paymentMethodId: string, amount: number): P
 
 /**
  * Checkout all items in user's cart with FCFS collision handling
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with purchase results or error
  */
-export async function POST(req: AuthenticatedRequest) {
+export const POST = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
         const clientIP = getClientIP(req.headers);
 
         if (isRateLimitedForOperation(clientIP, 'purchases')) {
@@ -89,7 +109,35 @@ export async function POST(req: AuthenticatedRequest) {
             );
         }
 
-        const { paymentMethodId, shippingAddress, notes } = validationResult.data as CheckoutRequestBody;
+        const { paymentMethodId, cvv, oneTimePayment, shippingAddress, notes } = validationResult.data as CheckoutRequestBody;
+
+        let effectivePaymentMethodId = paymentMethodId;
+
+        if (paymentMethodId && cvv) {
+            const userData = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { paymentMethods: true }
+            });
+
+            if (!userData) {
+                return createErrorResponse('ユーザーが見つかりません', 404);
+            }
+
+            const paymentMethods = (userData.paymentMethods as any[] || []) as EncryptedPaymentMethod[];
+            const selectedMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
+
+            if (!selectedMethod) {
+                return createErrorResponse('支払い方法が見つかりません', 404);
+            }
+
+            if (!verifyCvv(cvv, selectedMethod.cvvHash)) {
+                recordAttemptForOperation(clientIP, 'purchases');
+                return createErrorResponse('無効なCVVです', 400);
+            }
+        } else if (oneTimePayment) {
+            const cardLast4 = oneTimePayment.cardNumber.slice(-4);
+            effectivePaymentMethodId = `one_time_${oneTimePayment.cardBrand}_${cardLast4}`;
+        }
 
         const cart = await prisma.cart.findUnique({
             where: { userId },
@@ -159,7 +207,7 @@ export async function POST(req: AuthenticatedRequest) {
             });
         }
 
-        const paymentResult = await mockPaymentValidation(paymentMethodId, totalAmount);
+        const paymentResult = await mockPaymentValidation(effectivePaymentMethodId || 'unknown', totalAmount);
         if (!paymentResult.success) {
             logAuditEvent({
                 action: 'CART_CHECKOUT_PAYMENT_FAILED',
@@ -203,7 +251,7 @@ export async function POST(req: AuthenticatedRequest) {
                         cardId: card.id,
                         price: card.price!,
                         status: 'PAID',
-                        paymentMethod: paymentMethodId,
+                        paymentMethod: effectivePaymentMethodId,
                         shippingAddress: shippingAddress,
                         notes: notes,
                     },
@@ -261,18 +309,85 @@ export async function POST(req: AuthenticatedRequest) {
             timestamp: new Date(),
             details: { 
                 transactionId: paymentResult.transactionId,
-                totalAmount: purchases.reduce((sum, p) => sum + p.price, 0),
+                totalAmount,
                 successfulPurchases,
                 failedItems,
                 originalItemCount: cart.items.length
             }
         });
 
+        if (successfulPurchases > 0) {
+            const buyer = await prisma.user.findUnique({
+                where: { id: userId },
+                select: {
+                    name: true,
+                    email: true
+                }
+            });
+
+            if (buyer && buyer.email) {
+                try {
+                    const orderDate = new Date().toLocaleDateString('ja-JP', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    const shippingCost = 24.00;
+                    const protocol = req.headers.get('x-forwarded-proto') || 'http';
+                    const host = req.headers.get('host') || 'localhost:3000';
+                    const baseUrl = `${protocol}://${host}`;
+
+                    const emailData = {
+                        orderId: paymentResult.transactionId || purchases[0].id,
+                        orderDate,
+                        customerName: buyer.name || 'お客様',
+                        customerEmail: buyer.email,
+                        items: purchases.map(p => ({
+                            cardName: p.card.name,
+                            player: p.card.player,
+                            team: p.card.team,
+                            year: p.card.year,
+                            condition: p.card.condition,
+                            price: p.price,
+                            imageUrl: p.card.imageUrl ? `${baseUrl}${p.card.imageUrl}` : undefined
+                        })),
+                        subtotal: totalAmount,
+                        shipping: shippingCost,
+                        total: totalAmount + shippingCost,
+                        shippingAddress: {
+                            name: shippingAddress.name,
+                            streetAddress: shippingAddress.streetAddress,
+                            city: shippingAddress.city,
+                            state: shippingAddress.state,
+                            postalCode: shippingAddress.postalCode,
+                            country: shippingAddress.country,
+                            phone: shippingAddress.phone
+                        }
+                    };
+
+                    const emailHtml = generateOrderConfirmationEmail(emailData);
+                    const emailText = generateOrderConfirmationText(emailData);
+
+                    await sendEmail({
+                        to: buyer.email,
+                        subject: `注文確認 - ${paymentResult.transactionId || purchases[0].id} - SWISH`,
+                        html: emailHtml,
+                        text: emailText
+                    });
+                } catch (emailError) {
+                    console.error('[Checkout] Failed to send order confirmation email:', emailError);
+                }
+            }
+        }
+
         return createSuccessResponse({
             purchases,
             summary: {
                 totalPurchases: successfulPurchases,
-                totalAmount: purchases.reduce((sum, p) => sum + p.price, 0),
+                totalAmount,
                 failedItems,
                 invalidItems: invalidItems.map(({ item, reason }) => ({
                     cardId: item.cardId,
@@ -290,4 +405,4 @@ export async function POST(req: AuthenticatedRequest) {
         console.error('Cart checkout error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
