@@ -3,7 +3,6 @@ import prisma from '@/lib/prisma';
 import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { isRateLimitedForOperation, recordAttemptForOperation, withAuth } from '@/lib/auth';
-import { verifyCvv } from '@/lib/payment_methods';
 import { EncryptedPaymentMethod, PaymentMethodMetadata } from '@/types/schemas/payment_schemas';
 import { sendEmail } from '@/lib/smtp';
 import { generateOrderConfirmationEmail, generateOrderConfirmationText } from '@/lib/email_templates';
@@ -113,28 +112,7 @@ export const POST = withAuth(async (req, user) => {
 
         let effectivePaymentMethodId = paymentMethodId;
 
-        if (paymentMethodId && cvv) {
-            const userData = await prisma.user.findUnique({
-                where: { id: userId },
-                select: { paymentMethods: true }
-            });
-
-            if (!userData) {
-                return createErrorResponse('ユーザーが見つかりません', 404);
-            }
-
-            const paymentMethods = (userData.paymentMethods as any[] || []) as EncryptedPaymentMethod[];
-            const selectedMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
-
-            if (!selectedMethod) {
-                return createErrorResponse('支払い方法が見つかりません', 404);
-            }
-
-            if (!verifyCvv(cvv, selectedMethod.cvvHash)) {
-                recordAttemptForOperation(clientIP, 'purchases');
-                return createErrorResponse('無効なCVVです', 400);
-            }
-        } else if (oneTimePayment) {
+        if (oneTimePayment) {
             const cardLast4 = oneTimePayment.cardNumber.slice(-4);
             effectivePaymentMethodId = `one_time_${oneTimePayment.cardBrand}_${cardLast4}`;
         }

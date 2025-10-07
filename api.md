@@ -439,7 +439,7 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 - Card data is encrypted at rest in the database
 
 ### POST `/api/users/me/payment-methods`
-**Description:** Add a new payment method (encrypted and stored securely)
+**Description:** Add a new payment method (encrypted and stored securely). The server generates a secure ID.
 **Authentication:** Required
 **CSRF Protection:** Required
 
@@ -448,7 +448,6 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 {
   "paymentMethods": [
     {
-      "id": "card_1234567890_abc",
       "cardNumber": "4242424242424242",
       "expiryMonth": "12",
       "expiryYear": "25",
@@ -467,7 +466,7 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 {
   "success": true,
   "data": {
-    "id": "card_1234567890_abc",
+    "id": "card_3f6f4b35-8e9a-4f5e-9d9e-1b2c3d4e5f6a",
     "cardBrand": "visa",
     "last4": "4242",
     "expiryMonth": "12",
@@ -490,6 +489,7 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 - Requires security PIN if user has one set
 - Full card details are never returned to frontend
 - CVV is never stored (only used for transaction processing)
+- Payment method IDs are generated server-side using UUID v4 and prefixed with `card_`. Client-supplied IDs are ignored.
 
 ### DELETE `/api/users/me/payment-methods/[id]`
 **Description:** Remove a specific payment method
@@ -1095,7 +1095,6 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 ```json
 {
   "paymentMethodId": "pm_abc123_encrypted_id",
-  "cvv": "123",
   "shippingAddress": {
     "name": "John Doe",
     "phone": "+81-90-1234-5678",
@@ -1134,10 +1133,9 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 ```
 
 **Note:** 
-- **Saved Payment Method**: Use `paymentMethodId` with `cvv` for saved cards
+- **Saved Payment Method**: Use `paymentMethodId` for saved cards
   - `paymentMethodId` is the ID of a saved payment method (returned from `/api/users/me/payment-methods`)
-  - `cvv` is required and validated against the stored CVV hash
-  - The CVV is hashed using SHA-256 and stored with the payment method for validation during checkout
+  - CVV is not stored server-side and is not required for saved cards
 - **One-Time Payment**: Use `oneTimePayment` object for guest/temporary card usage
   - Card details are NOT stored in the database
   - Used for users who don't want to save their card information
@@ -1146,10 +1144,8 @@ Sets secure HttpOnly cookies for authentication and a JavaScript-readable CSRF t
 - `phone` is optional in the shipping address
 
 **Security:**
-- **Saved Methods**: CVV is never stored in plaintext; only a SHA-256 hash is kept for validation
+- **Saved Methods**: CVV is not stored or validated server-side
 - **One-Time Payments**: Card data is never persisted to the database
-- CVV verification occurs before payment processing
-- Invalid CVV will result in a 400 error and increment the rate limit counter
 - One-time payment details are only used for the current transaction and immediately discarded
 
 **Response (Success):**

@@ -113,6 +113,16 @@ export default function PaymentModal({
             return;
         }
 
+        const parsedYear = parseInt(expiryYear, 10);
+        const year = expiryYear.length === 2 ? 2000 + parsedYear : parsedYear;
+        const now = new Date();
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = now.getUTCMonth() + 1; // 1-12
+        if (year < currentYear || (year === currentYear && month < currentMonth)) {
+            alert('カードの有効期限が切れています');
+            return;
+        }
+
         if (saveCard && !cardNickname) {
             alert('カードのニックネームを入力してください');
             return;
@@ -120,13 +130,13 @@ export default function PaymentModal({
 
         setIsSaving(true);
 
-        const paymentMethodId = `card_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const tempId = globalThis.crypto?.randomUUID ? `temp_${globalThis.crypto.randomUUID()}` : `temp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         const cardBrand = detectedBrand || detectCardBrand(cardNumber);
         const last4 = cardNumber.replace(/\s/g, '').slice(-4);
         const cleanedCardNumber = cardNumber.replace(/\s/g, '');
         
         const paymentMethodData: PaymentMethodData = {
-            id: paymentMethodId,
+            id: saveCard ? '' : tempId,
             cardBrand,
             last4,
             expiryMonth,
@@ -142,7 +152,6 @@ export default function PaymentModal({
             try {
                 const backendPaymentData = {
                     paymentMethods: [{
-                        id: paymentMethodId,
                         cardNumber: cardNumber.replace(/\s/g, ''),
                         expiryMonth,
                         expiryYear,
@@ -167,9 +176,22 @@ export default function PaymentModal({
                     throw new Error(errorData.message || 'Failed to save payment method');
                 }
 
-                onSave(paymentMethodData);
+                const result = await response.json();
+                const data = result?.data;
+                if (!data || typeof data.id !== 'string' || !data.id.startsWith('card_')) {
+                    throw new Error('Invalid server response when saving payment method');
+                }
+
+                onSave({
+                    id: data.id,
+                    cardBrand: data.cardBrand || cardBrand,
+                    last4: data.last4 || last4,
+                    expiryMonth: data.expiryMonth || expiryMonth,
+                    expiryYear: data.expiryYear || expiryYear,
+                    nickname: data.nickname || cardNickname,
+                });
             } catch (error) {
-                console.error('Error saving payment method:', error);
+                console.error('Error saving payment method');
                 alert(error instanceof Error ? error.message : 'カード情報の保存に失敗しました');
                 setIsSaving(false);
                 return;

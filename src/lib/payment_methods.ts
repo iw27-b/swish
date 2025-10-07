@@ -18,7 +18,6 @@ export function encryptPaymentMethod(paymentMethod: {
     cardholderName: string;
     expiryMonth: string;
     expiryYear: string;
-    cvv: string;
     cardBrand: string;
     last4: string;
     nickname?: string;
@@ -26,13 +25,10 @@ export function encryptPaymentMethod(paymentMethod: {
     const sensitiveData = {
         cardNumber: paymentMethod.cardNumber,
         cardholderName: paymentMethod.cardholderName,
-        expiryMonth: paymentMethod.expiryMonth,
-        expiryYear: paymentMethod.expiryYear,
     };
     
     const encryptedData = encrypt(JSON.stringify(sensitiveData));
     const fingerprint = hashData(paymentMethod.cardNumber);
-    const cvvHash = hashData(paymentMethod.cvv);
     
     const now = new Date().toISOString();
     
@@ -41,9 +37,10 @@ export function encryptPaymentMethod(paymentMethod: {
         encryptedData,
         cardBrand: paymentMethod.cardBrand,
         last4: paymentMethod.last4,
+        expiryMonth: paymentMethod.expiryMonth,
+        expiryYear: paymentMethod.expiryYear,
         nickname: paymentMethod.nickname,
         fingerprint,
-        cvvHash,
         createdAt: now,
         updatedAt: now,
     };
@@ -59,19 +56,24 @@ export function encryptPaymentMethod(paymentMethod: {
 export function decryptPaymentMethod(
     encryptedPaymentMethod: EncryptedPaymentMethod
 ): DecryptedPaymentMethod {
-    const decryptedData = JSON.parse(decrypt(encryptedPaymentMethod.encryptedData));
-    
-    return {
-        id: encryptedPaymentMethod.id,
-        cardNumber: decryptedData.cardNumber,
-        cardholderName: decryptedData.cardholderName,
-        expiryMonth: decryptedData.expiryMonth,
-        expiryYear: decryptedData.expiryYear,
-        cardBrand: encryptedPaymentMethod.cardBrand,
-        last4: encryptedPaymentMethod.last4,
-        nickname: encryptedPaymentMethod.nickname,
-        createdAt: encryptedPaymentMethod.createdAt,
-    };
+    try {
+        const decryptedData = JSON.parse(decrypt(encryptedPaymentMethod.encryptedData));
+
+        return {
+            id: encryptedPaymentMethod.id,
+            cardNumber: decryptedData.cardNumber,
+            cardholderName: decryptedData.cardholderName,
+            expiryMonth: encryptedPaymentMethod.expiryMonth,
+            expiryYear: encryptedPaymentMethod.expiryYear,
+            cardBrand: encryptedPaymentMethod.cardBrand,
+            last4: encryptedPaymentMethod.last4,
+            nickname: encryptedPaymentMethod.nickname,
+            createdAt: encryptedPaymentMethod.createdAt,
+        };
+    } catch (_err) {
+        console.error('decryptPaymentMethod failed', { paymentMethodId: encryptedPaymentMethod.id });
+        throw new Error('Failed to decrypt payment method');
+    }
 }
 
 /**
@@ -84,30 +86,20 @@ export function decryptPaymentMethod(
 export function getPaymentMethodMetadata(
     encryptedPaymentMethod: EncryptedPaymentMethod
 ): PaymentMethodMetadata {
-    const decryptedData = JSON.parse(decrypt(encryptedPaymentMethod.encryptedData));
-    
-    return {
+    try {
+        return {
         id: encryptedPaymentMethod.id,
         cardBrand: encryptedPaymentMethod.cardBrand,
         last4: encryptedPaymentMethod.last4,
-        expiryMonth: decryptedData.expiryMonth,
-        expiryYear: decryptedData.expiryYear,
+        expiryMonth: encryptedPaymentMethod.expiryMonth,
+        expiryYear: encryptedPaymentMethod.expiryYear,
         nickname: encryptedPaymentMethod.nickname,
-        cvvHash: encryptedPaymentMethod.cvvHash,
         createdAt: encryptedPaymentMethod.createdAt,
-    };
-}
-
-/**
- * Verify CVV matches the stored hash
- * 
- * @param cvv - CVV to verify
- * @param cvvHash - Stored CVV hash
- * @returns True if CVV matches
- */
-export function verifyCvv(cvv: string, cvvHash: string): boolean {
-    const inputCvvHash = hashData(cvv);
-    return inputCvvHash === cvvHash;
+        };
+    } catch (_err) {
+        console.error('getPaymentMethodMetadata failed', { paymentMethodId: encryptedPaymentMethod.id });
+        throw new Error('Failed to read payment method metadata');
+    }
 }
 
 /**

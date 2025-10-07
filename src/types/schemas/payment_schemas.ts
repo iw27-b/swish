@@ -6,7 +6,6 @@ import { z } from 'zod';
  */
 export const AddPaymentMethodSchema = z.object({
     paymentMethods: z.array(z.object({
-        id: z.string().min(1, 'Payment method ID is required'),
         cardNumber: z.string()
             .min(13, 'Card number must be at least 13 digits')
             .max(19, 'Card number must be at most 19 digits')
@@ -30,7 +29,15 @@ export const AddPaymentMethodSchema = z.object({
         nickname: z.string()
             .max(50, 'Nickname is too long')
             .optional(),
-    })).length(1, 'Exactly one payment method must be provided')
+    }).refine((data) => {
+        const month = Number(data.expiryMonth);
+        const year = Number(data.expiryYear);
+        if (Number.isNaN(month) || Number.isNaN(year)) return false;
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1; // 1-12
+        const currentYear = now.getFullYear() % 100; // two-digit year
+        return year > currentYear || (year === currentYear && month >= currentMonth);
+    }, { message: 'Card has expired', path: ['expiryYear'] })).length(1, 'Exactly one payment method must be provided')
 });
 
 /**
@@ -46,9 +53,10 @@ export interface EncryptedPaymentMethod {
     encryptedData: string; // cardNumber, expiryMonth, expiryYear, cardholderName
     cardBrand: string;
     last4: string;
+    expiryMonth: string;
+    expiryYear: string;
     nickname?: string;
     fingerprint: string;
-    cvvHash: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -63,7 +71,6 @@ export interface PaymentMethodMetadata {
     expiryMonth: string;
     expiryYear: string;
     nickname?: string;
-    cvvHash: string;
     createdAt: string;
 }
 

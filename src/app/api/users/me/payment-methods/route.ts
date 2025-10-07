@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { withAuth } from '@/lib/auth';
 import { AddPaymentMethodSchema, EncryptedPaymentMethod } from '@/types/schemas/payment_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { randomUUID } from 'crypto';
 import { encryptPaymentMethod, getPaymentMethodMetadata, isDuplicateCard } from '@/lib/payment_methods';
 import { requirePinIfSet } from '@/lib/pin_utils';
 
@@ -103,13 +104,14 @@ export const POST = withAuth(async (req, user) => {
             return createErrorResponse('This card is already saved to your account', 409);
         }
 
+        const generatedId = `card_${randomUUID()}`;
+
         const encrypted = encryptPaymentMethod({
-            id: paymentMethodInput.id,
+            id: generatedId,
             cardNumber: paymentMethodInput.cardNumber,
             cardholderName: paymentMethodInput.cardholderName,
             expiryMonth: paymentMethodInput.expiryMonth,
             expiryYear: paymentMethodInput.expiryYear,
-            cvv: paymentMethodInput.cvv,
             cardBrand: paymentMethodInput.cardBrand,
             last4: paymentMethodInput.last4,
             nickname: paymentMethodInput.nickname,
