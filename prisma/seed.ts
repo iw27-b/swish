@@ -489,42 +489,43 @@ async function main() {
     }
     console.log(`✅ Created ${trackingCount} card tracking entries`);
 
-    // Create purchases
-    console.log('💰 Creating purchases...');
-    const purchasesData = [];
-    const sellableCards = allCards.filter(card => card.isForSale && card.price);
+    // Create purchases - DISABLED to keep all cards available for testing cart/checkout
+    // console.log('💰 Creating purchases...');
+    // const purchasesData = [];
+    // const sellableCards = allCards.filter(card => card.isForSale && card.price);
 
-    // Create fewer purchases since we have fewer cards
-    const purchaseCount = Math.min(15, sellableCards.length);
-    for (let i = 0; i < purchaseCount; i++) {
-        const card = faker.helpers.arrayElement(sellableCards);
-        const buyer = faker.helpers.arrayElement(users.filter(u => u.id !== card.ownerId));
-        const seller = users.find(u => u.id === card.ownerId);
+    // // Create fewer purchases since we have fewer cards
+    // const purchaseCount = Math.min(15, sellableCards.length);
+    // for (let i = 0; i < purchaseCount; i++) {
+    //     const card = faker.helpers.arrayElement(sellableCards);
+    //     const buyer = faker.helpers.arrayElement(users.filter(u => u.id !== card.ownerId));
+    //     const seller = users.find(u => u.id === card.ownerId);
 
-        if (seller) {
-            purchasesData.push({
-                buyerId: buyer.id,
-                sellerId: seller.id,
-                cardId: card.id,
-                price: card.price!,
-                status: faker.helpers.enumValue(PurchaseStatus),
-                paymentMethod: faker.helpers.arrayElement(['Credit Card', 'PayPal', 'Bank Transfer']),
-                shippingAddress: {
-                    street: faker.location.streetAddress(),
-                    city: faker.location.city(),
-                    state: faker.location.state(),
-                    zipCode: faker.location.zipCode(),
-                    country: 'USA'
-                },
-                trackingNumber: faker.datatype.boolean(0.6) ? faker.string.alphanumeric(10).toUpperCase() : null,
-                notes: faker.datatype.boolean(0.3) ? faker.lorem.sentence() : null,
-                completedAt: faker.datatype.boolean(0.7) ? faker.date.recent({ days: 30 }) : null
-            });
-        }
-    }
+    //     if (seller) {
+    //         purchasesData.push({
+    //             buyerId: buyer.id,
+    //             sellerId: seller.id,
+    //             cardId: card.id,
+    //             price: card.price!,
+    //             status: faker.helpers.enumValue(PurchaseStatus),
+    //             paymentMethod: faker.helpers.arrayElement(['Credit Card', 'PayPal', 'Bank Transfer']),
+    //             shippingAddress: {
+    //                 street: faker.location.streetAddress(),
+    //                 city: faker.location.city(),
+    //                 state: faker.location.state(),
+    //                 zipCode: faker.location.zipCode(),
+    //                 country: 'USA'
+    //             },
+    //             trackingNumber: faker.datatype.boolean(0.6) ? faker.string.alphanumeric(10).toUpperCase() : null,
+    //             notes: faker.datatype.boolean(0.3) ? faker.lorem.sentence() : null,
+    //             completedAt: faker.datatype.boolean(0.7) ? faker.date.recent({ days: 30 }) : null
+    //         });
+    //     }
+    // }
 
-    const purchases = await prisma.purchase.createMany({ data: purchasesData });
-    console.log(`✅ Created ${purchasesData.length} purchases`);
+    // const purchases = await prisma.purchase.createMany({ data: purchasesData });
+    // console.log(`✅ Created ${purchasesData.length} purchases`);
+    // console.log('💰 Skipping purchase creation (disabled for testing)');
 
     // Create trades
     console.log('🔄 Creating trades...');
@@ -620,7 +621,7 @@ async function main() {
     console.log(`👥 User Follows: ${follows.length}`);
     console.log(`❤️ Card Favorites: ${favoritesCount}`);
     console.log(`👀 Card Tracking: ${trackingCount}`);
-    console.log(`💰 Purchases: ${purchasesData.length}`);
+    console.log(`💰 Purchases: 0 (disabled for testing)`);
     console.log(`🔄 Trades: ${tradesData.length}`);
     console.log(`🤝 Collection Shares: ${sharesCount}`);
     console.log('\n🔑 Admin login: admin@swish.com / admin123');

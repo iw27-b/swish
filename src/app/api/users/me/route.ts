@@ -4,9 +4,15 @@ import { withAuth } from '@/lib/auth';
 import { UpdateUserSchema, UpdateSensitiveUserSchema } from '@/types/schemas/user_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
+import { EncryptedPaymentMethod } from '@/types/schemas/payment_schemas';
+import { getPaymentMethodMetadata } from '@/lib/payment_methods';
 
 /**
  * Get current user's complete profile
+ * 
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
+ * @returns JSON response with user profile or error
  */
 export const GET = withAuth(async (req, user) => {
     try {
@@ -19,6 +25,7 @@ export const GET = withAuth(async (req, user) => {
                 languagePreference: true, profileImageUrl: true,
                 phoneNumber: true, dateOfBirth: true, bio: true,
                 shippingAddress: true,
+                paymentMethods: true,
                 securityPin: true
             },
         });
@@ -27,9 +34,13 @@ export const GET = withAuth(async (req, user) => {
             return createErrorResponse('User not found', 404);
         }
 
-        const { securityPin, ...profileData } = userData;
+        const paymentMethods = (userData.paymentMethods as any[] || []) as EncryptedPaymentMethod[];
+        const paymentMethodsMetadata = paymentMethods.map(pm => getPaymentMethodMetadata(pm));
+
+        const { securityPin, paymentMethods: _, ...profileData } = userData;
         const responseData = {
             ...profileData,
+            paymentMethods: paymentMethodsMetadata,
             hasSecurityPin: !!securityPin
         };
 
@@ -52,6 +63,10 @@ export const GET = withAuth(async (req, user) => {
 
 /**
  * Update current user's profile with PIN protection
+ * 
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
+ * @returns JSON response with updated user profile or error
  */
 export const PATCH = withAuth(async (req, user) => {
     try {
@@ -147,15 +162,20 @@ async function getUserProfile(userId: string) {
             languagePreference: true, profileImageUrl: true,
             phoneNumber: true, dateOfBirth: true, bio: true,
             shippingAddress: true,
+            paymentMethods: true,
             securityPin: true
         },
     });
 
     if (!user) return null;
 
-    const { securityPin, ...userData } = user;
+    const paymentMethods = (user.paymentMethods as any[] || []) as EncryptedPaymentMethod[];
+    const paymentMethodsMetadata = paymentMethods.map(pm => getPaymentMethodMetadata(pm));
+
+    const { securityPin, paymentMethods: _, ...userData } = user;
     return {
         ...userData,
+        paymentMethods: paymentMethodsMetadata,
         hasSecurityPin: !!securityPin
     };
 }

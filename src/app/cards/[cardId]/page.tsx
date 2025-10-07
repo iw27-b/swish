@@ -1,6 +1,9 @@
 'use client';
 
 import React, { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth, authFetch } from "@/lib/client_auth";
+import LoadingSpinner from "@/components/loading_spinner";
 
 interface CardPageProps {
     params: Promise<{ cardId: string }>; // ✅ Next.js 15 params 是 Promise
@@ -33,17 +36,87 @@ interface Card {
 
 export default function CardPage({ params }: CardPageProps) {
     const { cardId } = use(params); // ✅ 解包 Promise
+    const router = useRouter();
+    const { user } = useAuth();
     const [card, setCard] = useState<Card | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [addingToCart, setAddingToCart] = useState(false);
 
-    // 搜索框状态
     const [searchInput, setSearchInput] = useState("");
 
     const handleSearchSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         console.log("Search:", searchInput);
-        // TODO: 这里可以做跳转或者搜索 API 请求
+    };
+
+    const handleAddToCart = async () => {
+        if (!user) {
+            router.push('/auth/login');
+            return;
+        }
+
+        if (!card?.id) {
+            console.error('Card ID is not found: ', card?.id);
+            return;
+        }
+
+        setAddingToCart(true);
+        try {
+            const response = await authFetch('/api/cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ cardId: card.id }),
+            });
+            const data = await response.json();
+
+            if (response.ok) {
+                console.log('Card added to cart successfully');
+            } else {
+                console.error('Failed to add card to cart');
+            }
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+        } finally {
+            setAddingToCart(false);
+        }
+    };
+
+    const handleBuyNow = async () => {
+        if (!user) {
+            router.push('/auth/login');
+            return;
+        }
+
+        if (!card?.id) {
+            console.error('Card ID is not found: ', card?.id);
+            return;
+        }
+
+        setAddingToCart(true);
+        try {
+            const response = await authFetch('/api/cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ cardId: card.id }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                router.push('/checkout');
+            } else {
+                console.error('Failed to add card to cart');
+            }
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+        } finally {
+            setAddingToCart(false);
+        }
     };
 
     // 大图状态
@@ -182,11 +255,19 @@ export default function CardPage({ params }: CardPageProps) {
 
                         <hr className="border-0 border-t border-dotted border-gray-500 w-[292px] my-5" />
 
-                        <button className="w-[292px] h-14 rounded-[40px] text-sm font-bold text-center leading-14 cursor-pointer mb-3 bg-black text-white border border-black hover:bg-white hover:text-black transition-colors">
-                            今すぐ購入
+                        <button 
+                            onClick={handleBuyNow}
+                            disabled={addingToCart || !card.isForSale}
+                            className="w-[292px] h-14 rounded-[40px] text-sm font-bold text-center leading-14 cursor-pointer mb-3 bg-black text-white border border-black hover:bg-white hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {addingToCart ? <LoadingSpinner /> : '今すぐ購入'}
                         </button>
-                        <button className="w-[292px] h-14 rounded-[40px] text-sm font-bold text-center leading-14 cursor-pointer mb-3 bg-white text-black border border-black hover:bg-black hover:text-white transition-colors">
-                            カートに入れる
+                        <button 
+                            onClick={handleAddToCart}
+                            disabled={addingToCart || !card.isForSale}
+                            className="w-[292px] h-14 rounded-[40px] text-sm font-bold text-center leading-14 cursor-pointer mb-3 bg-white text-black border border-black hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {addingToCart ? <LoadingSpinner />: 'カートに入れる'}
                         </button>
                     </div>
                 </main>

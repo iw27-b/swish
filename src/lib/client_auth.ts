@@ -248,21 +248,40 @@ export async function authFetch(
 
     let response = await fetch(url, defaultOptions);
 
-    if (response.status === 401) {
-        const refreshResponse = await fetch('/api/auth/refresh', {
-            method: 'POST',
-            credentials: 'include',
-        });
-
-        if (refreshResponse.ok) {
-            if (isStateChanging) {
-                const csrfToken = getCsrfToken();
-                if (csrfToken) {
-                    headers['X-CSRF-Token'] = csrfToken;
+    if (response.status === 401 || (response.status === 403 && isStateChanging)) {
+        let shouldRefresh = response.status === 401;
+        
+        if (response.status === 403) {
+            try {
+                const errorData = await response.clone().json();
+                if (errorData.message?.toLowerCase().includes('csrf')) {
+                    console.warn('[authFetch] CSRF token invalid or expired, refreshing tokens...');
+                    shouldRefresh = true;
                 }
+            } catch {
+                shouldRefresh = false;
             }
-            defaultOptions.headers = headers;
-            response = await fetch(url, defaultOptions);
+        }
+
+        if (shouldRefresh) {
+            const refreshResponse = await fetch('/api/auth/refresh', {
+                method: 'POST',
+                credentials: 'include',
+            });
+
+            if (refreshResponse.ok) {
+                console.log('[authFetch] Tokens refreshed successfully, retrying request');
+                if (isStateChanging) {
+                    const csrfToken = getCsrfToken();
+                    if (csrfToken) {
+                        headers['X-CSRF-Token'] = csrfToken;
+                    }
+                }
+                defaultOptions.headers = headers;
+                response = await fetch(url, defaultOptions);
+            } else {
+                console.error('[authFetch] Token refresh failed');
+            }
         }
     }
 
