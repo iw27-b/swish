@@ -1,31 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdateUserSchema, UpdateUserRequestBody } from '@/types/schemas/user_schemas';
 import { VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { isRateLimitedForOperation, recordAttemptForOperation, withAuth } from '@/lib/auth';
 
 /**
  * This route is used to get a specific user's profile.
- * @param req AuthenticatedRequest - The user object that is authenticated
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with success or error message
  */
 
-export async function GET(
-    req: AuthenticatedRequest, 
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             logAuditEvent({
@@ -44,7 +41,7 @@ export async function GET(
             return createErrorResponse('User ID is required', 400);
         }
 
-        const user = await prisma.user.findUnique({
+        const dbUser = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
@@ -61,7 +58,7 @@ export async function GET(
             },
         });
 
-        if (!user) {
+        if (!dbUser) {
             return createErrorResponse('User not found', 404);
         }
 
@@ -75,32 +72,30 @@ export async function GET(
             timestamp: new Date(),
         });
 
-        return createSuccessResponse(user, 'User profile retrieved successfully');
+        return createSuccessResponse(dbUser, 'User profile retrieved successfully');
 
     } catch (error) {
         console.error('Get user error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * This route is used to update a specific user's profile.
- * @param req AuthenticatedRequest - The user object that is authenticated
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with success or error message
  */
 
-export async function PATCH(
-    req: AuthenticatedRequest, 
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId) {
             logAuditEvent({
@@ -230,26 +225,24 @@ export async function PATCH(
         console.error('Update user error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * This route is used to delete a specific user's profile. (AS ADMIN)
- * @param req AuthenticatedRequest - The user object that is authenticated
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with success or error message
  */
 
-export async function DELETE(
-    req: AuthenticatedRequest, 
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             logAuditEvent({
@@ -339,4 +332,4 @@ export async function DELETE(
         console.error('Delete user error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

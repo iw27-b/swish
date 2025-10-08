@@ -181,6 +181,20 @@ export function clearAttemptsForOperation(ip: string, operation: keyof typeof RA
 
 export async function getAuthenticatedUser(req: NextRequest): Promise<JwtPayload | null> {
     try {
+        const userDataHeader = req.headers.get('x-user-data');
+        if (userDataHeader) {
+            try {
+                const userData = JSON.parse(userDataHeader);
+                if (userData.userId && userData.role) {
+                    return {
+                        userId: userData.userId,
+                        role: userData.role
+                    };
+                }
+            } catch {
+            }
+        }
+
         let accessToken = parseTokenFromCookie(req.headers.get('cookie'), 'access_token');
 
         if (!accessToken) {
@@ -208,6 +222,26 @@ export async function requireAuth(req: NextRequest): Promise<JwtPayload> {
     return user;
 }
 
+export function hydrateAuthenticatedRequest(req: NextRequest): NextRequest & { user: JwtPayload | null } {
+    const userDataHeader = req.headers.get('x-user-data');
+    let user: JwtPayload | null = null;
+
+    if (userDataHeader) {
+        try {
+            const userData = JSON.parse(userDataHeader);
+            if (userData.userId && userData.role) {
+                user = {
+                    userId: userData.userId,
+                    role: userData.role
+                };
+            }
+        } catch {
+        }
+    }
+
+    return Object.assign(req, { user });
+}
+
 export async function verifyAuth(req: NextRequest): Promise<{success: boolean, user: JwtPayload}> {
     try {
         const user = await getAuthenticatedUser(req);
@@ -221,16 +255,17 @@ export async function verifyAuth(req: NextRequest): Promise<{success: boolean, u
 }
 
 export function withAuth<T extends any[]>(
-    handler: (req: NextRequest, user: JwtPayload, ...args: T) => Promise<Response>
+    handler: (req: NextRequest & { user: JwtPayload }, user: JwtPayload, ...args: T) => Promise<Response>
 ) {
-    return async (req: NextRequest, ...args: T): Promise<Response> => {
-        const user = await getAuthenticatedUser(req);
+    return async (request: NextRequest, ...args: T): Promise<Response> => {
+        const user = await getAuthenticatedUser(request);
         if (!user) {
             return Response.json({
                 success: false,
                 message: 'Authentication required'
             }, { status: 401 });
         }
+        const req = Object.assign(request, { user });
         return handler(req, user, ...args);
     };
 }

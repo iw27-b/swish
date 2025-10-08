@@ -1,20 +1,16 @@
-import { NextRequest } from 'next/server';
-import { AuthenticatedRequest } from '@/types';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { deleteCsrfCookie } from '@/lib/csrf';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Handles user logout by clearing all authentication cookies
- * @param req AuthenticatedRequest - The user object that is authenticated
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with success message and clears cookies
  */
-export async function POST(req: AuthenticatedRequest) {
+export const POST = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
 
         logAuditEvent({
             action: 'USER_LOGOUT',
@@ -55,4 +51,4 @@ export async function POST(req: AuthenticatedRequest) {
         console.error('Logout error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 
