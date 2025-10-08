@@ -1,6 +1,7 @@
 'use client';
 
 import React, { use, useEffect, useState } from "react";
+import { Heart } from "lucide-react";
 import "./style.css";
 
 interface CardPageProps {
@@ -41,6 +42,11 @@ export default function CardPage({ params }: CardPageProps) {
   // 搜索框状态
   const [searchInput, setSearchInput] = useState("");
 
+    const [liked, setLiked] = useState(false);
+  const toggleLike = () => {
+    setLiked(!liked);
+  };
+  
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Search:", searchInput);
@@ -149,9 +155,27 @@ export default function CardPage({ params }: CardPageProps) {
           </ul>
 
           {/* 大图 */}
-          <div className="main-image">
-            <img id="main-image" src={mainImage} alt={card.name} />
-          </div>
+          {/* 大图 + 收藏按钮 */}
+<div className="main-image relative">
+  {/* 收藏按钮 */}
+  <div
+    onClick={toggleLike}
+    role="button"
+    aria-pressed={liked}
+    aria-label={liked ? '取消收藏' : '收藏'}
+    className="absolute top-[15px] right-[15px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 z-10 hover:scale-105 hover:opacity-80"
+  >
+    <Heart
+      className={`w-5 h-5 transition-colors duration-200 ${liked ? 'text-red-500 fill-current' : 'text-gray-400'}`}
+      fill={liked ? 'currentColor' : 'none'}
+      aria-hidden="true"
+    />
+  </div>
+
+  {/* 大图 */}
+  <img id="main-image" src={mainImage} alt={card.name} />
+</div>
+
 
           {/* 卡片信息 */}
           <div className="introduce">
