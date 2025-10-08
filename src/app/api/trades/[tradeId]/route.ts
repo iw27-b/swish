@@ -1,27 +1,24 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdateTradeSchema, UpdateTradeRequestBody } from '@/types/schemas/trade_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Get a specific trade by ID
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The trade ID
  * @returns JSON response with trade data or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ tradeId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { tradeId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role } = user;
 
         if (!tradeId) {
             return createErrorResponse('Trade ID is required', 400);
@@ -99,25 +96,23 @@ export async function GET(
         console.error('Get trade error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Update trade status (accept, reject, cancel)
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The trade ID
  * @returns JSON response with updated trade data or error
  */
-export async function PATCH(
-    req: AuthenticatedRequest,
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ tradeId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { tradeId } = await params;
-        const { userId } = req.user;
+        const { userId } = user;
 
         if (!tradeId) {
             return createErrorResponse('Trade ID is required', 400);
@@ -271,25 +266,23 @@ export async function PATCH(
         }
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Delete a trade (admin only or cancel pending trades)
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The trade ID
  * @returns JSON response with success or error message
  */
-export async function DELETE(
-    req: AuthenticatedRequest,
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ tradeId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { tradeId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role} = user;
 
         if (!tradeId) {
             return createErrorResponse('Trade ID is required', 400);
@@ -347,4 +340,4 @@ export async function DELETE(
         console.error('Delete trade error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

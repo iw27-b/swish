@@ -1,27 +1,25 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { PurchaseQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
+import { withAuth } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
  * Get user's purchase history with pagination and filtering
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with purchase history or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only view your own purchase history', 403);
@@ -174,4 +172,4 @@ export async function GET(
         console.error('Get purchase history error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

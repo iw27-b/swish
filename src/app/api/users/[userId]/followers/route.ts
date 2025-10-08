@@ -1,27 +1,24 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { FollowUserSchema, FollowUserRequestBody, FollowQuerySchema } from '@/types/schemas/user_extended_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Get user's followers with pagination
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with followers list or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -123,25 +120,23 @@ export async function GET(
         console.error('Get followers error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Follow a user
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID to follow
  * @returns JSON response with success message or error
  */
-export async function POST(
-    req: AuthenticatedRequest,
+export const POST = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId === userId) {
             return createErrorResponse('You cannot follow yourself', 400);
@@ -202,25 +197,23 @@ export async function POST(
         console.error('Follow user error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Unfollow a user
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID to unfollow
  * @returns JSON response with success message or error
  */
-export async function DELETE(
-    req: AuthenticatedRequest,
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         const existingFollow = await prisma.userFollow.findUnique({
             where: {
@@ -260,4 +253,4 @@ export async function DELETE(
         console.error('Unfollow user error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

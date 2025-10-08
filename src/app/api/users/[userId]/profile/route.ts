@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdateExtendedUserSchema, UpdateExtendedUserRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, withAuth } from '@/lib/auth';
 import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
 
@@ -11,27 +10,24 @@ type CombinedRequestBody = UpdateExtendedUserRequestBody & { pin?: string };
 
 /**
  * Get user's extended profile information
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with extended profile data or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
 
-        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
+        if (user.userId !== userId && user.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only view your own extended profile', 403);
         }
 
-        const user = await prisma.user.findUnique({
+        const targetUser = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
@@ -64,7 +60,7 @@ export async function GET(
             },
         });
 
-        if (!user) {
+        if (!targetUser) {
             return createErrorResponse('User not found', 404);
         }
 
@@ -74,13 +70,13 @@ export async function GET(
         });
 
         const userResponse = {
-            ...user,
+            ...targetUser,
             hasSecurityPin: !!pinCheck?.securityPin
         };
 
         logAuditEvent({
             action: 'USER_EXTENDED_PROFILE_VIEWED',
-            userId: requestingUser.userId,
+            userId: user.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'user',
@@ -94,25 +90,23 @@ export async function GET(
         console.error('Get extended profile error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Update user's extended profile
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with updated profile or error
  */
-export async function PATCH(
-    req: AuthenticatedRequest,
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only update your own profile', 403);
@@ -218,4 +212,4 @@ export async function PATCH(
         console.error('Update extended profile error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 
