@@ -183,11 +183,6 @@ export async function getAuthenticatedUser(req: NextRequest): Promise<JwtPayload
     try {
         const userDataHeader = req.headers.get('x-user-data');
         if (userDataHeader) {
-            const internalSecret = req.headers.get('x-internal-secret');
-            if (internalSecret !== process.env.INTERNAL_SERVICE_SECRET) {
-                return null;
-            }
-
             try {
                 const userData = JSON.parse(userDataHeader);
                 if (
