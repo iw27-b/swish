@@ -167,6 +167,10 @@ export async function middleware(req: NextRequest) {
         return NextResponse.next();
     }
 
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.delete('x-user-data');
+    requestHeaders.delete('x-internal-user');
+
     let accessToken = parseTokenFromCookie(req.headers.get('cookie'), 'access_token');
     // console.log(`[Middleware] ${method} ${path} - Access token found:`, !!accessToken);
     
@@ -223,7 +227,6 @@ export async function middleware(req: NextRequest) {
         return NextResponse.json({ success: false, message }, { status: 403 });
     }
 
-    const requestHeaders = new Headers(req.headers);
     requestHeaders.set('x-user-data', JSON.stringify({ userId: decodedPayload.userId, role: decodedPayload.role }));
     if (!requestHeaders.get('x-request-id')) {
         requestHeaders.set('x-request-id', crypto.randomUUID());

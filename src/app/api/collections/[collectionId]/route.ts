@@ -1,28 +1,25 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdateCollectionSchema, UpdateCollectionRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Get a specific collection
- * @param req AuthenticatedRequest - The authenticated request
- * @param params - The user ID and collection ID
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
+ * @param params - The collection ID
  * @returns JSON response with collection data or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ collectionId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { collectionId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         const collection = await prisma.collection.findUnique({
             where: { id: collectionId },
@@ -105,25 +102,23 @@ export async function GET(
         console.error('Get collection error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Update a specific collection
- * @param req AuthenticatedRequest - The authenticated request
- * @param params - The user ID and collection ID
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
+ * @param params - The collection ID
  * @returns JSON response with updated collection or error
  */
-export async function PATCH(
-    req: AuthenticatedRequest,
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ collectionId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { collectionId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         let requestBody;
         try {
@@ -228,25 +223,23 @@ export async function PATCH(
         console.error('Update collection error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Delete a collection
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID and collection ID
  * @returns JSON response with success or error message
  */
-export async function DELETE(
-    req: AuthenticatedRequest,
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string; collectionId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId, collectionId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only delete your own collections', 403);
@@ -310,4 +303,4 @@ export async function DELETE(
         console.error('Delete collection error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

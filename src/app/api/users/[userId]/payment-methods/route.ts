@@ -1,9 +1,9 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePin } from '@/lib/pin_utils';
+import { withAuth } from '@/lib/auth';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
 
@@ -49,27 +49,24 @@ type UpdatePaymentMethodsRequestBody = z.infer<typeof UpdatePaymentMethodsSchema
 
 /**
  * Get user's payment methods
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with payment methods or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
 
-        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
+        if (user.userId !== userId && user.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only view your own payment methods', 403);
         }
 
-        const user = await prisma.user.findUnique({
+        const targetUser = await prisma.user.findUnique({
             where: { id: userId },
             select: {
                 id: true,
@@ -77,13 +74,13 @@ export async function GET(
             },
         });
 
-        if (!user) {
+        if (!targetUser) {
             return createErrorResponse('User not found', 404);
         }
 
         logAuditEvent({
             action: 'PAYMENT_METHODS_VIEWED',
-            userId: requestingUser.userId,
+            userId: user.userId,
             ip: getClientIP(req.headers),
             userAgent: getUserAgent(req.headers),
             resource: 'user',
@@ -91,7 +88,7 @@ export async function GET(
             timestamp: new Date(),
         });
 
-        const sanitizedMethods = sanitizePaymentMethods(user.paymentMethods || []);
+        const sanitizedMethods = sanitizePaymentMethods(targetUser.paymentMethods || []);
         return createSuccessResponse(
             { paymentMethods: sanitizedMethods }, 
             'Payment methods retrieved successfully'
@@ -101,25 +98,23 @@ export async function GET(
         console.error('Get payment methods error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Update user's payment methods (requires PIN)
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with updated payment methods or error
  */
-export async function PATCH(
-    req: AuthenticatedRequest,
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId) {
             return createErrorResponse('Forbidden: You can only update your own payment methods', 403);
@@ -201,4 +196,4 @@ export async function PATCH(
         console.error('Update payment methods error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

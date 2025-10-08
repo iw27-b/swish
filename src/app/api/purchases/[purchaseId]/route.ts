@@ -1,27 +1,24 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdatePurchaseSchema, UpdatePurchaseRequestBody } from '@/types/schemas/trade_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Get a specific purchase by ID
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The purchase ID
  * @returns JSON response with purchase data or error
  */
-export async function GET(
-    req: AuthenticatedRequest,
+export const GET = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ purchaseId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { purchaseId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role } = user;
 
         if (!purchaseId) {
             return createErrorResponse('Purchase ID is required', 400);
@@ -93,25 +90,23 @@ export async function GET(
         console.error('Get purchase error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Update purchase status (for sellers to update shipping, etc.)
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The purchase ID
  * @returns JSON response with updated purchase data or error
  */
-export async function PATCH(
-    req: AuthenticatedRequest,
+export const PATCH = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ purchaseId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { purchaseId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role } = user;
 
         if (!purchaseId) {
             return createErrorResponse('Purchase ID is required', 400);
@@ -257,4 +252,4 @@ export async function PATCH(
         }
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

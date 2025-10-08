@@ -1,23 +1,19 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UserListQuerySchema, UserListQuery } from '@/types/schemas/user_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * This route is used to list all users. (AS ADMIN)
- * @param req AuthenticatedRequest - The user object that is authenticated
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with success or error message
  */
 
-export async function GET(req: AuthenticatedRequest) {
+export const GET = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.role !== Role.ADMIN) {
             logAuditEvent({
@@ -123,4 +119,4 @@ export async function GET(req: AuthenticatedRequest) {
         console.error('List users error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

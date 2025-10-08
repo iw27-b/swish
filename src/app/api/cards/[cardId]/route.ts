@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { UpdateCardSchema, UpdateCardRequestBody } from '@/types/schemas/card_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize, retryWithBackoff, logObservabilityError } from '@/lib/api_utils';
 import { validateImageFile } from '@/lib/image_utils';
-import { verifyAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
+import { withAuth, isRateLimited, recordFailedAttempt } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
@@ -72,13 +71,14 @@ export async function GET(
  * @param params - The card ID
  * @returns JSON response with updated card data or error
  */
-export async function PATCH(
+export const PATCH = withAuth(async (
     req: NextRequest,
+    user: { userId: string, role: Role },
     { params }: { params: Promise<{ cardId: string }> }
-) {
+) => {
     try {
         const clientIP = getClientIP(req.headers);
-        
+
         if (isRateLimited(clientIP)) {
             logAuditEvent({
                 action: 'CARD_UPDATE_RATE_LIMITED',
@@ -90,14 +90,8 @@ export async function PATCH(
             return createErrorResponse('Too many update attempts. Please try again later.', 429);
         }
 
-        const authResult = await verifyAuth(req);
-        if (!authResult.success || !authResult.user) {
-            recordFailedAttempt(clientIP);
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { cardId } = await params;
-        const { userId, role } = authResult.user;
+        const { userId, role } = user;
 
         if (!cardId) {
             recordFailedAttempt(clientIP);
@@ -259,25 +253,23 @@ export async function PATCH(
         console.error('Update card error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Delete a specific card
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The card ID
  * @returns JSON response with success or error message
  */
-export async function DELETE(
-    req: AuthenticatedRequest,
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ cardId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { cardId } = await params;
-        const { userId, role } = req.user;
+        const { userId, role } = user;
 
         if (!cardId) {
             return createErrorResponse('Card ID is required', 400);
@@ -435,4 +427,4 @@ export async function DELETE(
         console.error('Delete card error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

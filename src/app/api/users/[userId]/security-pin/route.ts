@@ -1,29 +1,26 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { SetSecurityPinSchema, SetSecurityPinRequestBody, VerifyPinSchema, VerifyPinRequestBody } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { requirePinIfSet } from '@/lib/pin_utils';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, withAuth } from '@/lib/auth';
 import { Role } from '@prisma/client';
 
 /**
  * Set or update user's security PIN
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with success message or error
  */
-export async function POST(
-    req: AuthenticatedRequest,
+export const POST = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId) {
             return createErrorResponse('Forbidden: You can only set your own security PIN', 403);
@@ -74,25 +71,23 @@ export async function POST(
         console.error('Set security PIN error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Remove security PIN (requires current PIN)
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The user ID
  * @returns JSON response with success or error message
  */
-export async function DELETE(
-    req: AuthenticatedRequest,
+export const DELETE = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ userId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { userId } = await params;
-        const requestingUser = req.user;
+        const requestingUser = user;
 
         if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
             return createErrorResponse('Forbidden: You can only remove your own security PIN', 403);
@@ -140,4 +135,4 @@ export async function DELETE(
         console.error('Remove security PIN error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

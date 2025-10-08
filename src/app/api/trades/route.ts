@@ -1,22 +1,17 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { CreateTradeSchema, CreateTradeRequestBody, TradeListQuerySchema, TradeListQuery } from '@/types/schemas/trade_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize, createPaginationInfo } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, createPaginationInfo } from '@/lib/api_utils';
+import { withAuth, isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Get user's trades with pagination and filtering
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with trades data or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export const GET = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
 
@@ -116,20 +111,17 @@ export async function GET(req: AuthenticatedRequest) {
         console.error('List trades error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Create a new trade offer
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with created trade data or error
  */
-export async function POST(req: AuthenticatedRequest) {
+export const POST = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
         const clientIP = getClientIP(req.headers);
 
         if (isRateLimitedForOperation(clientIP, 'trades')) {
@@ -303,4 +295,4 @@ export async function POST(req: AuthenticatedRequest) {
         }
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

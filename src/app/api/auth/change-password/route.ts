@@ -88,11 +88,11 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'New password must be different from current password' }, { status: 400 });
         }
 
-        const hashedNewPassword = hashPassword(newPassword);
+        const hashedNewPassword = await hashPassword(newPassword);
         await prisma.user.update({
             where: { id: userId },
             data: {
-                password: await hashedNewPassword,
+                password: hashedNewPassword,
                 updatedAt: new Date()
             }
         });

@@ -1,27 +1,24 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { CardOperationSchema, CardOperationRequestBody } from '@/types/schemas/trade_schemas';
-import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
+import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
+import { withAuth } from '@/lib/auth';
 
 /**
  * Handle card operations like listing for sale/trade, removing from sale/trade, updating price
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @param params - The card ID
  * @returns JSON response with updated card data or error
  */
-export async function POST(
-    req: AuthenticatedRequest,
+export const POST = withAuth(async (
+    req,
+    user,
     { params }: { params: Promise<{ cardId: string }> }
-) {
+) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
         const { cardId } = await params;
-        const { userId, role } = req.user; 
+        const { userId, role } = user; 
 
         if (!cardId) {
             return createErrorResponse('Card ID is required', 400);
@@ -181,4 +178,4 @@ export async function POST(
         console.error('Card operation error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

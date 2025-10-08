@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { CreatePurchaseSchema, CreatePurchaseRequestBody } from '@/types/schemas/trade_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { isRateLimitedForOperation, recordAttemptForOperation, withAuth } from '@/lib/auth';
 
 /**
  * Mock payment validation service
@@ -40,16 +39,13 @@ async function mockPaymentValidation(paymentMethodId: string, amount: number): P
 
 /**
  * Create a new purchase
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with created purchase data or error
  */
-export async function POST(req: AuthenticatedRequest) {
+export const POST = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
         const clientIP = getClientIP(req.headers);
 
         if (isRateLimitedForOperation(clientIP, 'purchases')) {
@@ -249,4 +245,4 @@ export async function POST(req: AuthenticatedRequest) {
         }
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 

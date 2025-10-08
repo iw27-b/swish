@@ -1,23 +1,18 @@
-import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AuthenticatedRequest } from '@/types';
 import { CreateCollectionSchema, CreateCollectionRequestBody, CollectionQuerySchema } from '@/types/schemas/user_extended_schemas';
 import { createSuccessResponse, createErrorResponse, getClientIP, getUserAgent, logAuditEvent, validateRequestSize } from '@/lib/api_utils';
 import { Role } from '@prisma/client';
-import { isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
+import { withAuth, isRateLimitedForOperation, recordAttemptForOperation } from '@/lib/auth';
 
 /**
  * Get authenticated user's collections with pagination and filtering
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with collections list or error
  */
-export async function GET(req: AuthenticatedRequest) {
+export const GET = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
 
         const url = new URL(req.url);
         const queryParams = Object.fromEntries(url.searchParams.entries());
@@ -124,20 +119,17 @@ export async function GET(req: AuthenticatedRequest) {
         console.error('Get collections error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-}
+});
 
 /**
  * Create a new collection for the authenticated user
- * @param req AuthenticatedRequest - The authenticated request
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
  * @returns JSON response with created collection or error
  */
-export async function POST(req: AuthenticatedRequest) {
+export const POST = withAuth(async (req, user) => {
     try {
-        if (!req.user) {
-            return createErrorResponse('Authentication required', 401);
-        }
-
-        const { userId } = req.user;
+        const { userId } = user;
 
         const clientIP = getClientIP(req.headers);
 
@@ -229,4 +221,4 @@ export async function POST(req: AuthenticatedRequest) {
         console.error('Create collection error:', error);
         return createErrorResponse('Internal server error', 500);
     }
-} 
+}); 
