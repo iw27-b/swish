@@ -37,12 +37,20 @@ const CardGrid: React.FC<CardGridProps> = ({ products }) => {
             {products.map((product) => (
                 <section key={product.id} className="w-full max-w-[285px] relative flex flex-col box-border">
                     <div
-                        className={`absolute top-[15px] right-[10px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer shadow-[0_2px_5px_rgba(0,0,0,0.15)] transition-all duration-300 z-10 ${likedItems.has(product.id) ? '[&>svg]:fill-red-500' : '[&>svg]:fill-gray-400'
-                            }`}
-                        onClick={() => toggleLike(product.id)}
-                    >
-                        <Heart className="w-[18px] h-[18px] transition-all duration-300" />
-                    </div>
+    onClick={() => toggleLike(product.id)}
+    className="absolute top-[15px] right-[10px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer  transition-all duration-300 z-10 hover:scale-105"
+>
+    <Heart
+        className={`w-5 h-5 transition-colors duration-200 ${
+            likedItems.has(product.id)
+                ? 'text-red-500 fill-current'
+                : 'text-gray-400'
+        }`}
+        fill={likedItems.has(product.id) ? 'currentColor' : 'none'}
+        aria-hidden="true"
+    />
+    </div>
+
                     <a href={product.href || '#'} className="no-underline text-inherit block">
                         <section className="w-full aspect-square rounded-2xl flex justify-center items-center bg-[#f7f7f7] p-4">
                             <div className="relative w-[85%] h-[85%]">
@@ -51,7 +59,7 @@ const CardGrid: React.FC<CardGridProps> = ({ products }) => {
                                     alt={product.title}
                                     fill
                                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                                    className="object-contain rounded-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_4px_8px_rgba(0,0,0,0.4)] cursor-pointer"
+                                    className="object-contain rounded-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                                 />
                             </div>
                         </section>
