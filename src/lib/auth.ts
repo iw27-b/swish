@@ -183,15 +183,27 @@ export async function getAuthenticatedUser(req: NextRequest): Promise<JwtPayload
     try {
         const userDataHeader = req.headers.get('x-user-data');
         if (userDataHeader) {
+            const internalSecret = req.headers.get('x-internal-secret');
+            if (internalSecret !== process.env.INTERNAL_SERVICE_SECRET) {
+                return null;
+            }
+
             try {
                 const userData = JSON.parse(userDataHeader);
-                if (userData.userId && userData.role) {
+                if (
+                    userData.userId &&
+                    userData.role &&
+                    Object.values(Role).includes(userData.role)
+                ) {
                     return {
                         userId: userData.userId,
-                        role: userData.role
+                        role: userData.role,
+                        iat: Math.floor(Date.now() / 1000),
+                        exp: Math.floor(Date.now() / 1000) + 900 // 15 min
                     };
                 }
             } catch {
+                // parsing failed, fall through to normal auth flow
             }
         }
 
@@ -222,23 +234,8 @@ export async function requireAuth(req: NextRequest): Promise<JwtPayload> {
     return user;
 }
 
-export function hydrateAuthenticatedRequest(req: NextRequest): NextRequest & { user: JwtPayload | null } {
-    const userDataHeader = req.headers.get('x-user-data');
-    let user: JwtPayload | null = null;
-
-    if (userDataHeader) {
-        try {
-            const userData = JSON.parse(userDataHeader);
-            if (userData.userId && userData.role) {
-                user = {
-                    userId: userData.userId,
-                    role: userData.role
-                };
-            }
-        } catch {
-        }
-    }
-
+export async function hydrateAuthenticatedRequest(req: NextRequest): Promise<NextRequest & { user: JwtPayload | null }> {
+    const user = await getAuthenticatedUser(req);
     return Object.assign(req, { user });
 }
 

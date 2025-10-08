@@ -72,8 +72,8 @@ export async function GET(
  * @returns JSON response with updated card data or error
  */
 export const PATCH = withAuth(async (
-    req,
-    user,
+    req: NextRequest,
+    user: { userId: string, role: Role },
     { params }: { params: Promise<{ cardId: string }> }
 ) => {
     try {
