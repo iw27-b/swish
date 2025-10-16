@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
             type: 'card' | 'user' | 'team' | 'player' | 'brand';
             count?: number;
             imageUrl?: string;
+            cardId?: string;
         }> = [];
 
         if (type === 'all' || type === 'cards') {
@@ -119,6 +120,7 @@ async function getCardSuggestions(query: string, limit: number) {
             ]
         },
         select: {
+            id: true,
             name: true,
             player: true,
             imageUrl: true
@@ -130,7 +132,8 @@ async function getCardSuggestions(query: string, limit: number) {
     return cards.map(card => ({
         text: `${card.name} - ${card.player}`,
         type: 'card' as const,
-        imageUrl: card.imageUrl || undefined
+        imageUrl: card.imageUrl || undefined,
+        cardId: card.id
     }));
 }
 
