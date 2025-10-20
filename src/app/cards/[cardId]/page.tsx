@@ -35,27 +35,23 @@ interface Card {
 }
 
 export default function CardPage({ params }: CardPageProps) {
-  const { cardId } = use(params); // ✅ 解包 Promise
+  const { cardId } = use(params);
   const router = useRouter();
 
   const [card, setCard] = useState<Card | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 搜索框状态
   const [searchInput, setSearchInput] = useState("");
-
-  // 收藏状态
   const [liked, setLiked] = useState(false);
   const toggleLike = () => setLiked((v) => !v);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Search:", searchInput);
-    // TODO: 跳转或请求搜索 API
   };
 
-  // 本地购物车：加入当前卡片（不跳转）
+  // 🛒 本地购物车：加入当前卡片（不跳转）
   const handleAddToCart = () => {
     if (!card) return;
     const key = "cart";
@@ -72,10 +68,31 @@ export default function CardPage({ params }: CardPageProps) {
     alert("カートに追加しました！");
   };
 
-  // 大图状态
+  // ✅ 新增：立即购买（先加入购物车再跳转）
+  const [isBuying, setIsBuying] = useState(false);
+  const handleBuyNow = () => {
+    if (!card || isBuying) return;
+    setIsBuying(true);
+    try {
+      const key = "cart";
+      const cart: Array<Card & { qty: number }> = JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+      const idx = cart.findIndex((c) => c.id === card.id);
+      if (idx >= 0) {
+        cart[idx].qty += 1;
+      } else {
+        cart.push({ ...card, qty: 1 });
+      }
+      localStorage.setItem(key, JSON.stringify(cart));
+    } finally {
+      router.push("/cart");
+    }
+  };
+
   const [mainImage, setMainImage] = useState<string>("");
 
-  // 拉取单卡数据
+  // 📡 拉取单卡数据
   useEffect(() => {
     const fetchCard = async () => {
       try {
@@ -92,7 +109,6 @@ export default function CardPage({ params }: CardPageProps) {
         const cardData = data.data ?? data.card ?? null;
         setCard(cardData);
 
-        // 初始化大图
         setMainImage(cardData?.imageUrl || "/images/card.png");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -165,7 +181,7 @@ export default function CardPage({ params }: CardPageProps) {
                   className="thumbnail"
                   src={img}
                   alt={`thumbnail-${idx}`}
-                  onClick={() => setMainImage(img)} // ✅ React 方式切换大图
+                  onClick={() => setMainImage(img)}
                 />
               </li>
             ))}
@@ -173,7 +189,6 @@ export default function CardPage({ params }: CardPageProps) {
 
           {/* 大图 + 收藏按钮 */}
           <div className="main-image relative">
-            {/* 收藏按钮 */}
             <div
               onClick={toggleLike}
               role="button"
@@ -190,7 +205,6 @@ export default function CardPage({ params }: CardPageProps) {
               />
             </div>
 
-            {/* 大图 */}
             <img id="main-image" src={mainImage} alt={card.name} />
           </div>
 
@@ -224,7 +238,8 @@ export default function CardPage({ params }: CardPageProps) {
 
             <button
               className="btn primary"
-              onClick={() => router.push("/cart")}
+              onClick={handleBuyNow}
+              disabled={isBuying}
             >
               今すぐ購入
             </button>
