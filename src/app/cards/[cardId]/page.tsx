@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
 import React, { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import "./style.css";
 
 interface CardPageProps {
-  params: Promise<{ cardId: string }>; // ✅ Next.js 15 params 是 Promise
+  params: Promise<{ cardId: string }>;
 }
 
 interface Card {
@@ -35,6 +36,8 @@ interface Card {
 
 export default function CardPage({ params }: CardPageProps) {
   const { cardId } = use(params); // ✅ 解包 Promise
+  const router = useRouter();
+
   const [card, setCard] = useState<Card | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,15 +45,31 @@ export default function CardPage({ params }: CardPageProps) {
   // 搜索框状态
   const [searchInput, setSearchInput] = useState("");
 
-    const [liked, setLiked] = useState(false);
-  const toggleLike = () => {
-    setLiked(!liked);
-  };
-  
+  // 收藏状态
+  const [liked, setLiked] = useState(false);
+  const toggleLike = () => setLiked((v) => !v);
+
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Search:", searchInput);
-    // TODO: 这里可以做跳转或者搜索 API 请求
+    // TODO: 跳转或请求搜索 API
+  };
+
+  // 本地购物车：加入当前卡片（不跳转）
+  const handleAddToCart = () => {
+    if (!card) return;
+    const key = "cart";
+    const cart: Array<Card & { qty: number }> = JSON.parse(
+      localStorage.getItem(key) || "[]"
+    );
+    const idx = cart.findIndex((c) => c.id === card.id);
+    if (idx >= 0) {
+      cart[idx].qty += 1;
+    } else {
+      cart.push({ ...card, qty: 1 });
+    }
+    localStorage.setItem(key, JSON.stringify(cart));
+    alert("カートに追加しました！");
   };
 
   // 大图状态
@@ -74,11 +93,7 @@ export default function CardPage({ params }: CardPageProps) {
         setCard(cardData);
 
         // 初始化大图
-        if (cardData?.imageUrl) {
-          setMainImage(cardData.imageUrl);
-        } else {
-          setMainImage("/images/card.png");
-        }
+        setMainImage(cardData?.imageUrl || "/images/card.png");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -140,9 +155,11 @@ export default function CardPage({ params }: CardPageProps) {
         <main className="gallery">
           {/* 缩略图 */}
           <ul className="thumbnails">
-            {[card.imageUrl || "/images/card.png",
+            {[
               card.imageUrl || "/images/card.png",
-              card.imageUrl || "/images/card.png"].map((img, idx) => (
+              card.imageUrl || "/images/card.png",
+              card.imageUrl || "/images/card.png",
+            ].map((img, idx) => (
               <li key={idx}>
                 <img
                   className="thumbnail"
@@ -154,28 +171,28 @@ export default function CardPage({ params }: CardPageProps) {
             ))}
           </ul>
 
-          {/* 大图 */}
           {/* 大图 + 收藏按钮 */}
-<div className="main-image relative">
-  {/* 收藏按钮 */}
-  <div
-    onClick={toggleLike}
-    role="button"
-    aria-pressed={liked}
-    aria-label={liked ? '取消收藏' : '收藏'}
-    className="absolute top-[15px] right-[15px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 z-10 hover:scale-105 hover:opacity-80"
-  >
-    <Heart
-      className={`w-5 h-5 transition-colors duration-200 ${liked ? 'text-red-500 fill-current' : 'text-gray-400'}`}
-      fill={liked ? 'currentColor' : 'none'}
-      aria-hidden="true"
-    />
-  </div>
+          <div className="main-image relative">
+            {/* 收藏按钮 */}
+            <div
+              onClick={toggleLike}
+              role="button"
+              aria-pressed={liked}
+              aria-label={liked ? "取消收藏" : "收藏"}
+              className="absolute top-[15px] right-[15px] w-10 h-10 bg-white rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 z-10 hover:scale-105 hover:opacity-80"
+            >
+              <Heart
+                className={`w-5 h-5 transition-colors duration-200 ${
+                  liked ? "text-red-500 fill-current" : "text-gray-400"
+                }`}
+                fill={liked ? "currentColor" : "none"}
+                aria-hidden="true"
+              />
+            </div>
 
-  {/* 大图 */}
-  <img id="main-image" src={mainImage} alt={card.name} />
-</div>
-
+            {/* 大图 */}
+            <img id="main-image" src={mainImage} alt={card.name} />
+          </div>
 
           {/* 卡片信息 */}
           <div className="introduce">
@@ -205,8 +222,15 @@ export default function CardPage({ params }: CardPageProps) {
 
             <hr className="divider2" />
 
-            <button className="btn primary">今すぐ購入</button>
-            <button className="btn secondary">カートに入れる</button>
+            <button
+              className="btn primary"
+              onClick={() => router.push("/cart")}
+            >
+              今すぐ購入
+            </button>
+            <button className="btn secondary" onClick={handleAddToCart}>
+              カートに入れる
+            </button>
           </div>
         </main>
       </div>
