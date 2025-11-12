@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { createSuccessResponse, createErrorResponse } from '@/lib/api_utils';
-import { getCart, addToCart } from '@/lib/cart_actions';
+import { getCart, addToCart, removeFromCart } from '@/lib/cart_actions';
 
 /**
  * Get user's shopping cart with all items
@@ -32,7 +32,7 @@ export const POST = withAuth(async (req, user) => {
         // console.log('[Cart/Items] Request received, user:', user);
         const { userId } = user;
         // console.log('[Cart/Items] User authenticated, userId:', userId);
-        
+
         let requestBody;
         try {
             requestBody = await req.json();
@@ -56,5 +56,41 @@ export const POST = withAuth(async (req, user) => {
     } catch (error) {
         console.error('Error adding to cart:', error);
         return createErrorResponse('Failed to add card to cart', 500);
+    }
+});
+
+/**
+ * Remove a card from user's cart
+ * @param req NextRequest - The request object
+ * @param user JwtPayload - The authenticated user
+ * @returns JSON response with success message or error
+ */
+export const DELETE = withAuth(async (req, user) => {
+    try {
+        const { userId } = user;
+
+        let requestBody;
+        try {
+            requestBody = await req.json();
+        } catch (error) {
+            return createErrorResponse('Invalid JSON format in request body', 400);
+        }
+
+        const { cardId } = requestBody;
+
+        if (!cardId || typeof cardId !== 'string') {
+            return createErrorResponse('Card ID is required', 400);
+        }
+
+        const result = await removeFromCart(userId, cardId);
+
+        if (!result.success) {
+            return createErrorResponse(result.message, 400);
+        }
+
+        return createSuccessResponse(null, result.message);
+    } catch (error) {
+        console.error('Error removing from cart:', error);
+        return createErrorResponse('Failed to remove card from cart', 500);
     }
 });
