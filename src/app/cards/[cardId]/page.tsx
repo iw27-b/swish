@@ -3,6 +3,7 @@
 import React, { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/client_auth";
+import { addToCart, isInCart } from "@/utils/cart";
 import LoadingSpinner from "@/components/loading_spinner";
 
 interface CardPageProps {
@@ -140,15 +141,15 @@ export default function CardPage({ params }: CardPageProps) {
 
   // ✅ 卡片加载后检查是否已在购物车中，已存在则直接显示「カートで見る」
   useEffect(() => {
-    if (!card?.id) return;
-    try {
-      const items = readCart();
-      const exists = items.some((it: any) => it?.id === card.id);
-      if (exists) setAddedToCart(true);
-    } catch {
-      // ignore
-    }
-  }, [card?.id]);
+    if (!card?.id || !user) return;
+
+    const checkCart = async () => {
+      const inCart = await isInCart(card.id);
+      if (inCart) setAddedToCart(true);
+    };
+
+    checkCart();
+  }, [card?.id, user]);
 
   // —— 操作：加入购物车（首次点击变更按钮，不弹 toast）/ 再次点击跳转 ——
   const handleAddToCart = async () => {
@@ -169,15 +170,16 @@ export default function CardPage({ params }: CardPageProps) {
     }
 
     setAddingToCart(true);
-    try {
-      upsertLocalCart(card);
-      setAddedToCart(true); // ✅ 切换按钮为「カートで見る」
-    } catch (error) {
-      console.error("Error adding to cart (local):", error);
-      showToast("カート追加に失敗しました。", "error");
-    } finally {
-      setAddingToCart(false);
+    // show toast if error to help debug
+    const result = await addToCart(card.id);
+
+    if (result.success) {
+      setAddedToCart(true);
+    } else {
+      showToast(result.message || "カート追加に失敗しました。", "error");
+      console.error("Error adding to cart: ", result.message);
     }
+    setAddingToCart(false);
   };
 
   // —— 操作：今すぐ購入（写入后直接进入 /cart） ——
@@ -193,15 +195,16 @@ export default function CardPage({ params }: CardPageProps) {
     }
 
     setAddingToCart(true);
-    try {
-      upsertLocalCart(card);
-      router.push("/cart");
-    } catch (err) {
-      console.error("Error buy now (local):", err);
-      router.push("/cart");
-    } finally {
-      setAddingToCart(false);
+    // show toast if error to help debug
+    const result = await addToCart(card.id);
+
+    if (!result.success) {
+      showToast(result.message || "カート追加に失敗しました。", "error");
+      console.error("Error adding to cart: ", result.message);
     }
+
+    setAddingToCart(false);
+    router.push("/cart");
   };
 
   if (loading) {

@@ -10,12 +10,8 @@ import React, {
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import {
-  readCart,
-  changeQty as cartChangeQty,
-  removeItem as cartRemoveItem,
-  totals as cartTotals,
-} from "@/utils/cart";
+import { getCart, removeFromCart, cartToViewItems } from "@/utils/cart";
+import { useAuth } from "@/lib/client_auth";
 
 type ViewItem = {
   id: string;
@@ -49,83 +45,50 @@ export default function CartPage() {
   const [searchInput, setSearchInput] = useState("");
 
   const router = useRouter();
+  const { user } = useAuth();
 
   // ----- 原始购物车（与 localStorage 对齐）-----
+  // localStorageを使わないでDBから取得
   const [rawItems, setRawItems] = useState<ViewItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // ✅ 分页：当前页（从 1 开始）
   const [page, setPage] = useState(1);
 
-  // 首次加载 + 同步（storage + BroadcastChannel）
-  useEffect(() => {
-    // 初次加载
-    setRawItems(safeRead());
-
-    // 跨标签页同步
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === "cart") {
-        setRawItems(safeRead());
-      }
-    };
-    window.addEventListener("storage", onStorage);
-
-    // 同标签页/同路由组件间同步
-    let bc: BroadcastChannel | null = null;
-    try {
-      bc = new BroadcastChannel("swish-cart");
-      bc.onmessage = (ev) => {
-        if (ev.data?.type === "cart-updated") {
-          setRawItems(safeRead());
-        }
-      };
-    } catch {
-      // BroadcastChannel 不可用时忽略
-    }
-
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      bc?.close();
-    };
-  }, []);
-
-  // 读取工具函数的结果，并做最小视图映射
-  function safeRead(): ViewItem[] {
-    const items = readCart();
-    return items.map((it: any) => ({
-      id: it.id,
-      name: it.name ?? "",
-      price: typeof it.price === "number" ? it.price : 0, // 假设为 USD
-      imageUrl: it.imageUrl ?? it.image ?? "/images/card.png",
-      qty: Math.max(0, Number(it.qty ?? 0)),
-    }));
-  }
-
-  // —— 数量增减 / 删除（用 utils，并回填本地状态）——
-  const changeQty = useCallback((id: string, delta: number) => {
-    const next = cartChangeQty(id, delta); // 写入存储并返回最新数组
-
-    // 找到该商品的新数量
-    const target = next.find((it: any) => it.id === id);
-    const newQty = Number(target?.qty ?? 0);
-
-    if (!target || newQty <= 0) {
-      // 数量归零（或已不存在）→ 直接删除并刷新视图
-      cartRemoveItem(id);
-      setRawItems(safeRead());
+  // 从数据库获取购物车
+  const fetchCartFromDB = useCallback(async () => {
+    if (!user) {
+      setRawItems([]);
+      setLoading(false);
       return;
     }
 
-    // 正常回填视图
-    setRawItems(
-      next.map((it: any) => ({
-        id: it.id,
-        name: it.name ?? "",
-        price: typeof it.price === "number" ? it.price : 0,
-        imageUrl: it.imageUrl ?? it.image ?? "/images/card.png",
-        qty: Math.max(0, Number(it.qty ?? 0)),
-      }))
-    );
-  }, []);
+    try {
+      const cart = await getCart();
+      const viewItems = cartToViewItems(cart);
+      setRawItems(viewItems);
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchCartFromDB();
+  }, [fetchCartFromDB]);
+
+  // —— 数量增减 / 删除（调用数据库）——
+  const changeQty = useCallback(async (id: string, delta: number) => {
+    if (delta < 0) {
+      // remove item from db
+      const result = await removeFromCart(id);
+      if (result.success) {
+        fetchCartFromDB(); // refresh from db
+      }
+    }
+    // NOTE: db cart doesn't support quantity adjustment (each item is unique)
+  }, [fetchCartFromDB]);
 
   // ----- 右上邮编 & 统一运费 -----
   const [postcode, setPostcode] = useState("100-0001");
@@ -143,15 +106,7 @@ export default function CartPage() {
   // ----- 搜索（仅过滤“视图”，不改写存储）-----
   const handleSearchSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const kw = searchInput.trim().toLowerCase();
-    if (!kw) {
-      setRawItems(safeRead());
-    } else {
-      const source = safeRead();
-      setRawItems(
-        source.filter((it) => (it.name ?? "").toLowerCase().includes(kw))
-      );
-    }
+    fetchCartFromDB(); // Re-fetch from db
     // ✅ 搜索后回到第一页
     setPage(1);
   };
@@ -231,7 +186,12 @@ export default function CartPage() {
         <div className="flex justify-center gap-10">
           {/* 左：商品列表 */}
           <section className="w-[868px]" aria-label="ショッピングカート">
-            {pageItems.length === 0 ? (
+            {loading ? (
+              <div className="text-center text-gray-500 py-16">
+                カートを読み込んでいます...
+              </div>
+            ) : (
+              pageItems.length === 0 ? (
               <div className="text-center text-gray-500 py-16">
                 カートは空です。
               </div>
@@ -358,6 +318,7 @@ export default function CartPage() {
                   </nav>
                 )}
               </>
+            )
             )}
           </section>
 
