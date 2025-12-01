@@ -13,10 +13,10 @@ import { requirePinIfSet } from '@/lib/pin_utils';
 export const DELETE = withAuth(async (
     req: NextRequest,
     user,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) => {
     try {
-        const paymentMethodId = params.id;
+        const { id: paymentMethodId } = await params;
 
         const requestBody = await req.json().catch(() => ({}));
         const { securityPin: pinFromBody } = requestBody;
