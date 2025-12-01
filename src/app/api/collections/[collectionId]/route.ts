@@ -229,21 +229,18 @@ export const PATCH = withAuth(async (
  * Delete a collection
  * @param req NextRequest - The request object
  * @param user JwtPayload - The authenticated user
- * @param params - The user ID and collection ID
+ * @param params - The collection ID
  * @returns JSON response with success or error message
  */
 export const DELETE = withAuth(async (
     req,
     user,
-    { params }: { params: Promise<{ userId: string; collectionId: string }> }
+    { params }: { params: Promise<{ collectionId: string }> }
 ) => {
     try {
-        const { userId, collectionId } = await params;
+        const { collectionId } = await params;
         const requestingUser = user;
-
-        if (requestingUser.userId !== userId && requestingUser.role !== Role.ADMIN) {
-            return createErrorResponse('Forbidden: You can only delete your own collections', 403);
-        }
+        const userId = requestingUser.userId;
 
         let requestBody: { pin?: string } = {};
         try {

@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Check } from 'lucide-react';
 import LoadingSpinner from '@/components/loading_spinner';
 import { useAuth } from '@/lib/client_auth';
 
-export default function CheckoutCompletePage() {
+function CheckoutCompleteContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { user, loading: authLoading } = useAuth();
@@ -101,6 +101,18 @@ export default function CheckoutCompletePage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function CheckoutCompletePage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-white flex items-center justify-center">
+                <LoadingSpinner fullScreen={false} size={48} />
+            </div>
+        }>
+            <CheckoutCompleteContent />
+        </Suspense>
     );
 }
 

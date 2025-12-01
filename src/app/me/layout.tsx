@@ -16,6 +16,8 @@ export const metadata: Metadata = {
     description: "NBA殿堂入り選手から今季MVPまで、世界限定カードが今だけ特価。最新の取引プラットフォームでバスケットボールカードコレクションを楽しもう。",
 };
 
+export const dynamic = 'force-dynamic';
+
 export default async function MeLayout({
     children,
 }: Readonly<{
