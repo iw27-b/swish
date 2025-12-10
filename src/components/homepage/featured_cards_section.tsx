@@ -52,13 +52,13 @@ const HomeFeaturedCardsSection: React.FC = () => {
             </div>
             {/* Center Card - Image */}
             <div className="flex items-end justify-center h-64 sm:h-80">
-              <div className="bg-gray-100 rounded-2xl sm:rounded-3xl h-full w-full p-[4px]">
+              <div className="bg-gray-100 rounded-2xl sm:rounded-3xl h-full w-full">
                 <div className="relative h-full w-full rounded-[inherit] overflow-hidden">
                   <Image
                     src="/images/card.png"
                     alt="Card"
                     fill
-                    className="object-cover"
+                    className="object-fill"
                   />
                 </div>
               </div>

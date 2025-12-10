@@ -64,9 +64,8 @@ const Header: React.FC = () => {
   }, [hoverIndex, activeIndex]);
   return (
     // TODO: authenticate with the backend and show the user's avatar.
-    <header className="px-2 sm:px-4 py-6">
+    <header className="sticky top-0 z-50 bg-white px-2 sm:px-4 py-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between w-full max-w-screen-lg xl:max-w-screen-xl mx-auto gap-0">
-        {/* Верхний ряд на мобильных: логотип и корзина */}
         <div className="flex items-center justify-center w-full lg:hidden">
           <div
             className="flex items-center justify-between"
@@ -124,7 +123,6 @@ const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Десктопная версия */}
         <div className="hidden lg:flex items-center" style={{ minWidth: 0 }}>
           <Link href="/">
             <Image
@@ -136,7 +134,6 @@ const Header: React.FC = () => {
             />
           </Link>
         </div>
-        {/* Мобильная навигация */}
         <nav className="flex items-center justify-center text-xs uppercase font-medium lg:hidden">
           <div className="relative flex items-center gap-2 px-1 py-1 flex-shrink-0">
             {navItems.map((item, index) => {
@@ -160,7 +157,6 @@ const Header: React.FC = () => {
           </div>
         </nav>
 
-        {/* Десктопная навигация */}
         <nav className="hidden lg:flex items-center text-sm uppercase font-medium">
           <div
             ref={containerRef}
