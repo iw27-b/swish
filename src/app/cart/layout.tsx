@@ -22,11 +22,9 @@ export default function CardsLayout({
 }>) {
   return (
     <div className={`${inter.variable} antialiased font-sans`}>
-      <div className="w-full max-w-screen-lg xl:max-w-screen-xl mx-auto px-3 sm:px-4">
-        <Header />
-        <main>{children}</main>
-        <Footer />
-      </div>
+      <Header />
+      <main>{children}</main>
+      <Footer />
     </div>
   );
 }
