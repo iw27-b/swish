@@ -17,13 +17,13 @@
 
 .featuredCards {
   padding-top: 2rem;
-  padding-bottom: 2rem;
+  padding-bottom: 7.5rem;
 }
 
 .spotlight {
   position: relative;
-  padding-top: 3rem;
-  padding-bottom: 5rem;
+  padding-top: 7.5rem;
+  padding-bottom: 7rem;
 }
 
 .container {
@@ -361,14 +361,14 @@
   padding-left: 1.25rem;
   padding-right: 1.25rem;
   padding-top: 3rem; /* py-12 */
-  padding-bottom: 3rem;
+  padding-bottom: 7rem;
   position: relative;
 }
 
 @media (min-width: 640px) {
   .spotlight {
     padding-top: 5rem; /* sm:py-20 */
-    padding-bottom: 5rem;
+    padding-bottom: 7.5rem;
   }
 }
 
