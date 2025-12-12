@@ -15,7 +15,7 @@ export default function News() {
   return (
     <div>
       <Header />
-      <main className="px-5 sm:px-10 py-12 sm:py-16">
+      <main className="px-5 sm:px-10 pt-6 pb-12 sm:pt-10 sm:pb-16">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8">
             最新情報
