@@ -25,7 +25,7 @@ const HomeSpotlightSection: React.FC = () => {
         {/* Stephen Curry Section */}
         <div className="relative">
           <div className="pointer-events-none absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-screen flex flex-col items-center justify-center space-y-2 sm:space-y-3">
-            <div className="text-[20vw] sm:text-[16vw] lg:text-[12vw] font-bold text-gray-100 whitespace-nowrap">
+            <div className="text-[20vw] sm:text-[16vw] lg:text-[12vw] font-bold text-gray-300 whitespace-nowrap">
               STEPH CURRY
             </div>
             <div className="text-[8vw] sm:text-[7vw] lg:text-[6vw] font-bold text-gray-200 whitespace-nowrap">
@@ -37,7 +37,7 @@ const HomeSpotlightSection: React.FC = () => {
             <div className="absolute left-0 top-1/2 transform -translate-y-1/2 cursor-pointer">
               <div
                 className="w-10 h-10 bg-white rounded-full flex items-center justify-center"
-                style={{ boxShadow: "0 0 15px rgba(0, 0, 0, 0.3)" }}
+                style={{ boxShadow: "0 0 20px rgba(0, 0, 0, 0.15)" }}
               >
                 <ChevronLeft className="w-5 h-5 text-black" />
               </div>
@@ -46,7 +46,7 @@ const HomeSpotlightSection: React.FC = () => {
             <div className="absolute right-0 top-1/2 transform -translate-y-1/2 cursor-pointer">
               <div
                 className="w-10 h-10 bg-white rounded-full flex items-center justify-center"
-                style={{ boxShadow: "0 0 15px rgba(0, 0, 0, 0.3)" }}
+                style={{ boxShadow: "0 0 20px rgba(0, 0, 0, 0.15)" }}
               >
                 <ChevronRight className="w-5 h-5 text-black" />
               </div>
