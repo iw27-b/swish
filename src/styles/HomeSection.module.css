@@ -12,18 +12,18 @@
 .hero {
   position: relative;
   padding-top: 3rem;
-  padding-bottom: 5rem;
+  padding-bottom: 120px;
 }
 
 .featuredCards {
-  padding-top: 2rem;
-  padding-bottom: 7.5rem;
+  padding-top: 120px;
+  padding-bottom: 100px;
 }
 
 .spotlight {
   position: relative;
-  padding-top: 7.5rem;
-  padding-bottom: 7rem;
+  padding-top: 100px;
+  padding-bottom: 120px;
 }
 
 .container {
@@ -204,13 +204,13 @@
   padding-left: 1.25rem;
   padding-right: 1.25rem;
   padding-top: 2rem; /* py-8 */
-  padding-bottom: 2rem;
+  padding-bottom: 100px;
 }
 
 @media (min-width: 640px) {
   .featuredCards {
     padding-top: 3rem; /* sm:py-12 */
-    padding-bottom: 3rem;
+    padding-bottom: 100px;
   }
 }
 
@@ -360,14 +360,14 @@
 .spotlight {
   padding-left: 1.25rem;
   padding-right: 1.25rem;
-  padding-top: 3rem; /* py-12 */
+  padding-top: 100px;
   padding-bottom: 7rem;
   position: relative;
 }
 
 @media (min-width: 640px) {
   .spotlight {
-    padding-top: 5rem; /* sm:py-20 */
+    padding-top: 100px;
     padding-bottom: 7.5rem;
   }
 }
