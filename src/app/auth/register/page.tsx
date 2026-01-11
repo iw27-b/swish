@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function RegisterPage() {
   const LOGIN_URL = '/auth/login';
@@ -63,7 +63,7 @@ export default function RegisterPage() {
     setPasswordInvalid(false);
   }
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     clearAllErrors();
 
@@ -114,7 +114,9 @@ export default function RegisterPage() {
       hasError = true;
     } else if (!(longEnough && hasUpper && hasLower && hasDigit && hasSymbol)) {
       setPasswordInvalid(true);
-      setPasswordErr('パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください。');
+      setPasswordErr(
+        'パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください。'
+      );
       hasError = true;
     }
 
@@ -211,207 +213,6 @@ export default function RegisterPage() {
           </form>
         </section>
       </main>
-
-      {/* ✅ style 必须在 return 里面 */}
-      <style jsx global>{`
-        * {
-          box-sizing: border-box;
-        }
-        html,
-        body {
-          height: 100%;
-        }
-        body {
-          margin: 0;
-          background: #f0f0f1;
-          color: #111;
-          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP",
-            Roboto, Arial;
-        }
-
-        .logo-bar {
-          position: fixed;
-          top: 18px;
-          left: 28px;
-          z-index: 10;
-        }
-        .logo-bar img {
-          width: 120px;
-          height: auto;
-          display: block;
-        }
-
-        .container {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: -20px;
-          padding: 60px 40px 40px;
-        }
-
-        .hero {
-          flex: 1 1 48%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          min-height: 320px;
-        }
-        .hero img {
-          width: 60%;
-          max-width: 380px;
-          height: auto;
-          display: block;
-          filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.18));
-          -webkit-mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 55%,
-            #000 75%,
-            transparent 100%
-          );
-          mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 55%,
-            #000 75%,
-            transparent 100%
-          );
-        }
-
-        .card {
-          flex: 0 0 460px;
-          background: #fff;
-          border-radius: 22px;
-          padding: 28px;
-          border: none;
-          box-shadow: none;
-          margin-left: -6px;
-        }
-
-        .head {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 10px;
-          color: #6b7280;
-          font-size: 14px;
-        }
-        .head span:first-child {
-          color: #000;
-          font-weight: 700;
-          font-size: 18px;
-        }
-        .head span:last-child {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          line-height: 1.3;
-        }
-        .head span:last-child a {
-          color: #000;
-          font-weight: 700;
-          text-decoration: none;
-        }
-        .head span:last-child a:hover {
-          text-decoration: underline;
-        }
-
-        h1 {
-          margin: 6px 0 22px;
-          font-size: 36px;
-          line-height: 1.1;
-          font-weight: 900;
-        }
-
-        form {
-          display: grid;
-          gap: 16px;
-        }
-        .field {
-          display: grid;
-          gap: 8px;
-        }
-        label {
-          font-weight: 700;
-          font-size: 14px;
-        }
-        .input {
-          width: 100%;
-          padding: 12px 14px;
-          background: #fff;
-          border: 1px solid #d1d5db;
-          border-radius: 12px;
-          outline: none;
-          transition: box-shadow 0.15s, border-color 0.15s;
-        }
-        .input:focus {
-          outline: none;
-          border-color: #bbb;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06);
-        }
-
-        .error {
-          color: #e11d48;
-          font-size: 12px;
-          margin-top: 6px;
-          min-height: 16px;
-        }
-        .input.is-invalid {
-          border-color: #ef4444;
-          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
-        }
-
-        .grid-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-        @media (max-width: 960px) {
-          .container {
-            flex-direction: column;
-            padding: 100px 16px 32px;
-          }
-          .grid-2 {
-            grid-template-columns: 1fr;
-          }
-          .card {
-            width: 100%;
-          }
-          .hero img {
-            width: 66%;
-            max-width: 320px;
-          }
-        }
-
-        .submit-row {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 12px;
-        }
-
-        .signup-btn {
-          background: #111;
-          color: #fff;
-          border: 0;
-          border-radius: 9999px;
-          height: 48px;
-          padding: 0 28px;
-          font-weight: 700;
-          letter-spacing: 0.2px;
-          box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
-          cursor: pointer;
-          transition: background-color 0.15s, box-shadow 0.15s, transform 0.02s;
-        }
-        .signup-btn:hover {
-          background: #000;
-          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28);
-        }
-        .signup-btn:active {
-          transform: translateY(1px);
-        }
-        .signup-btn:focus-visible {
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08),
-            0 12px 22px rgba(0, 0, 0, 0.22);
-        }
-      `}</style>
     </>
   );
 }
