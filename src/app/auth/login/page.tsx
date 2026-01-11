@@ -1,91 +1,452 @@
-"use client";
-/* eslint-disable @next/next/no-img-element */
-import React, { FormEvent } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/client_auth";
-import { Facebook, Apple } from "lucide-react";
-import Image from "next/image";
+'use client';
 
-export default function LoginPage(): React.ReactElement {
-    const router = useRouter();
-    const { login } = useAuth();
+import { useEffect, useMemo, useState } from 'react';
 
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const form = e.currentTarget;
-        const email = (form.querySelector("#email") as HTMLInputElement).value;
-        const password = (form.querySelector("#password") as HTMLInputElement).value;
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [showInfo, setShowInfo] = useState(false);
 
-        const result = await login(email, password);
-        if (result.success) {
-            router.replace("/me");
-        } else {
-            alert(result.message || "ログインに失敗しました");
-        }
-    };
+  const infoText = useMemo(
+    () => '登録が完了しました。ログインしてください。',
+    []
+  );
 
-    return (
-        <main className="min-h-screen bg-[#f0f0f1] text-[#111]">
-            <Link href="/" className="fixed top-[18px] left-[28px] z-10 text-2xl font-black tracking-tight">SWISH</Link>
-            <div className="min-h-screen flex items-center justify-center gap-4 px-4 pt-[60px] pb-10">
-                {/* 左侧插画 */}
-                <section className="flex items-center justify-center min-h-[320px] flex-[0_1_500px]">
-                    <img
-                        src="/images/auth/man.png"
-                        alt="バスケットボールのイラスト"
-                        className="w-full max-w-[460px] h-auto block"
-                        style={{ WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%)", maskImage: "radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%)" }}
-                    />
-                </section>
+  // 读取 URL 参数：?registered=1&email=xxx
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const emailParam = qs.get('email');
+    const registered = qs.get('registered');
 
-                {/* 右侧登录卡片 */}
-                <section className="flex-[0_0_520px] bg-white rounded-[22px] p-8 border-0 shadow-none ml-[-6px]">
-                    <div className="flex items-center justify-between text-[#6b7280] text-[14px] mb-2.5">
-                        <span>ようこそ SWISH</span>
-                        <span>
-                            アカウントがありません？ <Link href="/auth/register" className="text-[#0a58ff] hover:underline">新規登録</Link>
-                        </span>
-                    </div>
-                    <h1 className="m-0 mt-[6px] mb-[22px] text-[36px] leading-[1.1] font-black">ログイン</h1>
+    if (emailParam) setEmail(emailParam);
+    if (registered === '1') setShowInfo(true);
+  }, []);
 
-                    <form onSubmit={handleSubmit} className="grid gap-4">
-                        {/* 第一栏：三个按钮（图标登录占位） */}
-                        <div className="icon-row flex items-center gap-2 flex-nowrap">
-                            <button type="button" className="img-btn flex-[0_0_auto] w-[220px] h-[44px] px-3 rounded-[14px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10">
-                                <Image src="/images/auth/google.svg" alt="Google" width={16} height={16} className="mr-2" />
-                                <span className="text-sm font-semibold text-[#111]">Googleでログイン</span>
-                            </button>
-                            <button type="button" className="img-btn flex-[0_0_auto] w-[44px] h-[44px] p-[6px] rounded-[12px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10" aria-label="Facebookでログイン">
-                                <Image src="/images/auth/facebook.svg" alt="Facebook" width={16} height={16} />
-                            </button>
-                            <button type="button" className="img-btn flex-[0_0_auto] w-[44px] h-[44px] p-[6px] rounded-[12px] border border-[#e5e7eb] bg-white flex items-center justify-center hover:shadow-md focus:outline-none focus:ring-2 focus:ring-black/10" aria-label="Appleでログイン">
-                                <Image src="/images/auth/apple.svg" alt="Apple" width={24} height={24} />
-                            </button>
-                        </div>
+  return (
+    <>
+      <div className="logo-bar">
+        <img src="/pic/logo.png" alt="SWICH ロゴ" />
+      </div>
 
-                        {/* 第二栏：邮箱 */}
-                        <div className="grid gap-2">
-                            <label htmlFor="email" className="font-bold text-[14px]">メールアドレスを入力してください</label>
-                            <input id="email" name="email" type="email" required autoComplete="email" placeholder="メールアドレス" className="w-full px-[14px] py-3 bg-white border border-[#d1d5db] rounded-[12px] outline-none transition-[box-shadow,border-color] duration-150 focus:border-[#bbb] focus:shadow-[0_0_0_3px_rgba(17,17,17,.06)]" />
-                        </div>
+      <main className="container">
+        {/* 左侧插画 */}
+        <section className="hero">
+          <img src="/pic/man.png" alt="バスケットボールのイラスト" />
+        </section>
 
-                        {/* 第三栏：密码 */}
-                        <div className="grid gap-2">
-                            <label htmlFor="password" className="font-bold text-[14px]">パスワードを入力してください</label>
-                            <input id="password" name="password" type="password" required minLength={6} autoComplete="current-password" placeholder="パスワード" className="w-full px-[14px] py-3 bg-white border border-[#d1d5db] rounded-[12px] outline-none transition-[box-shadow,border-color] duration-150 focus:border-[#bbb] focus:shadow-[0_0_0_3px_rgba(17,17,17,.06)]" />
-                        </div>
+        {/* 右侧：纯白登录卡片 */}
+        <section className="card">
+          <div className="head">
+            <span>ようこそ SWICH</span>
+            <span>
+              アカウントがありません？ <a href="/auth/register">新規登録</a>
+            </span>
+          </div>
 
-                        <div className="flex justify-end text-[12px]">
-                            <Link href="#" className="text-[#0a58ff] no-underline hover:underline">パスワードを忘れます</Link>
-                        </div>
+          <h1>ログイン</h1>
 
-                        <div className="flex justify-center mt-2">
-                            <button type="submit" className="btn bg-[#111] text-white border-0 rounded-full px-[22px] py-[14px] w-[60%] max-w-[280px] font-bold tracking-[.2px] shadow-[0_12px_22px_rgba(0,0,0,.22)] hover:bg-black hover:shadow-[0_14px_26px_rgba(0,0,0,.28)] active:translate-y-px focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(17,17,17,.08),0_12px_22px_rgba(0,0,0,.22)]">ログイン</button>
-                        </div>
-                    </form>
-                </section>
+          {/* 注册成功提示 */}
+          <p
+            id="info"
+            style={{
+              display: showInfo ? 'block' : 'none',
+              color: '#065f46',
+              background: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              padding: '8px 12px',
+              borderRadius: 8,
+              margin: '-6px 0 6px',
+            }}
+          >
+            {infoText}
+          </p>
+
+          <form action="#" method="post">
+            {/* 第一栏：三个可点击的图片按钮 */}
+            <div className="icon-row">
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="google"
+                aria-label="Googleでログイン"
+              >
+                <img src="/pic/Google.png" alt="" />
+              </button>
+
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="github"
+                aria-label="GitHubでログイン"
+              >
+                <img src="/pic/fb.png" alt="" />
+              </button>
+
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="guest"
+                aria-label="ゲストで入る"
+              >
+                <img src="/pic/ios.png" alt="" />
+              </button>
             </div>
-        </main>
-    );
+
+            {/* 邮箱 */}
+            <div className="field">
+              <label htmlFor="email">メールアドレスを入力してください</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                className="input"
+                placeholder="メールアドレス"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            {/* 密码 */}
+            <div className="field">
+              <label htmlFor="password">パスワードを入力してください</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                className="input"
+                placeholder="パスワード"
+                required
+                minLength={8}
+              />
+            </div>
+
+            <div className="actions">
+              <a href="#">パスワードを忘れます</a>
+            </div>
+
+            {/* ✅ 登录按钮行：靠右 */}
+            <div className="submit-row">
+              <button type="submit" className="btn">
+                ログイン
+              </button>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
+        html,
+        body {
+          height: 100%;
+        }
+        body {
+          margin: 0;
+          background: #f0f0f1;
+          color: #111;
+          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP",
+            Roboto, Arial;
+        }
+
+        /* 左上角 LOGO（图片） */
+        .logo-bar {
+          position: fixed;
+          top: 18px;
+          left: 28px;
+          z-index: 10;
+        }
+        .logo-bar img {
+          width: 120px;
+          height: auto;
+          display: block;
+        }
+
+        /* 主区域：左图 + 右登录卡片 */
+        .container {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: -20px;
+          padding: 60px 40px 40px;
+        }
+        .card {
+          margin-left: -30px;
+        }
+
+        /* 左侧插画 */
+        .hero {
+          flex: 1 1 48%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 320px;
+        }
+        .hero img {
+          width: 100%;
+          max-width: 780px;
+          height: auto;
+          display: block;
+          filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25));
+          transform: translateY(4px);
+
+          -webkit-mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 55%,
+            #000 75%,
+            transparent 100%
+          );
+          mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 55%,
+            #000 75%,
+            transparent 100%
+          );
+        }
+
+        /* 右侧登录卡片 */
+        .card {
+          flex: 0 0 520px;
+          background: #fff;
+          border-radius: 22px;
+          padding: 32px;
+          border: none;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+        }
+
+        .head {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 10px;
+          color: #6b7280;
+          font-size: 14px;
+        }
+        .head span:first-child {
+          color: #000;
+          font-weight: 700;
+          font-size: 18px;
+        }
+        .head span:last-child {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          line-height: 1.3;
+        }
+        .head span:last-child a {
+          color: #000;
+          font-weight: 700;
+          text-decoration: none;
+        }
+        .head span:last-child a:hover {
+          text-decoration: underline;
+        }
+
+        h1 {
+          margin: 6px 0 22px;
+          font-size: 36px;
+          line-height: 1.1;
+          font-weight: 900;
+        }
+
+        /* 表单 */
+        form {
+          display: grid;
+          gap: 16px;
+        }
+        .field {
+          display: grid;
+          gap: 8px;
+        }
+        label {
+          font-weight: 700;
+          font-size: 14px;
+        }
+        .input {
+          width: 100%;
+          height: 48px;
+          padding: 12px 14px;
+          background: #fff;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 12px;
+          outline: none;
+          transition: box-shadow 0.15s, border-color 0.15s;
+        }
+        .input:focus {
+          outline: none;
+          border-color: #bbb;
+          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06);
+        }
+
+        .actions {
+          display: flex;
+          justify-content: flex-end;
+          font-size: 12px;
+        }
+        .actions a {
+          color: #0a58ff;
+          text-decoration: none;
+        }
+        .actions a:hover {
+          text-decoration: underline;
+        }
+
+        /* 图标行 */
+        .card .icon-row {
+          display: grid;
+          grid-template-columns: 1fr 48px 48px;
+          gap: 10px;
+          width: 100%;
+          margin-bottom: 12px;
+        }
+
+        .card .img-btn {
+          flex: 0 0 auto;
+          width: 44px;
+          height: 44px;
+          padding: 6px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #fff;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .card .img-btn img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          display: block;
+        }
+        .card .img-btn:hover {
+          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+          border-color: #d1d5db;
+        }
+        .card .img-btn:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
+        }
+
+        .icon-row {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: nowrap;
+        }
+        .img-btn {
+          flex: 0 0 auto;
+          width: 44px;
+          height: 44px;
+          padding: 6px;
+          border: 1px solid #e5e7eb;
+          border-radius: 12px;
+          background: #fff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+        .img-btn img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+          display: block;
+        }
+        .icon-row .img-btn:first-child {
+          width: 100%;
+          height: 48px;
+          padding: 0 14px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          gap: 10px;
+        }
+        .icon-row .img-btn:first-child img {
+          width: auto;
+          height: 70%;
+        }
+
+        @media (max-width: 960px) {
+          .container {
+            flex-direction: column;
+            gap: -10px;
+            padding: 100px 16px 32px;
+          }
+          .card {
+            width: 100%;
+            flex-basis: auto;
+          }
+          .hero img {
+            width: 66%;
+            max-width: 320px;
+          }
+          .icon-row .img-btn:first-child {
+            width: 200px;
+          }
+        }
+
+        .container,
+        .stage {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 40px;
+          padding: 96px 40px 40px;
+          max-width: 1440px;
+          margin: 0 auto;
+        }
+        .hero {
+          flex: 0 1 500px !important;
+        }
+        .hero img {
+          width: 100%;
+          max-width: 460px;
+          height: auto;
+        }
+        .card {
+          flex: 0 0 460px !important;
+          margin-left: -6px;
+        }
+
+        /* 登录按钮样式 */
+        .card form button.btn[type='submit'] {
+          background: #111 !important;
+          color: #fff !important;
+          border: 0 !important;
+          border-radius: 9999px !important;
+          padding: 14px 22px !important;
+          width: 40% !important;
+          max-width: 260px !important;
+          font-weight: 700;
+          letter-spacing: 0.2px;
+          box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
+          cursor: pointer;
+          transition: background-color 0.15s, box-shadow 0.15s, transform 0.02s;
+        }
+        .card form button.btn[type='submit']:hover {
+          background: #000;
+          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28);
+        }
+        .card form button.btn[type='submit']:active {
+          transform: translateY(1px);
+        }
+        .card form button.btn[type='submit']:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08),
+            0 12px 22px rgba(0, 0, 0, 0.22);
+        }
+
+        /* ✅ 按钮行：靠右 */
+        .submit-row {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 8px;
+          margin-right: 20px;
+        }
+      `}</style>
+    </>
+  );
 }
