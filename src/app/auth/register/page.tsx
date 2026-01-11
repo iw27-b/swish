@@ -28,32 +28,28 @@ export default function RegisterPage() {
       setEmailErr('');
       setEmailInvalid(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email]);
+  }, [email, emailErr]);
 
   useEffect(() => {
     if (nameErr && name.trim()) {
       setNameErr('');
       setNameInvalid(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]);
+  }, [name, nameErr]);
 
   useEffect(() => {
     if (contactErr && contact.trim()) {
       setContactErr('');
       setContactInvalid(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contact]);
+  }, [contact, contactErr]);
 
   useEffect(() => {
     if (passwordErr && password.trim()) {
       setPasswordErr('');
       setPasswordInvalid(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [password]);
+  }, [password, passwordErr]);
 
   function clearAllErrors() {
     setEmailErr('');
@@ -69,7 +65,6 @@ export default function RegisterPage() {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-
     clearAllErrors();
 
     let hasError = false;
@@ -88,7 +83,7 @@ export default function RegisterPage() {
       hasError = true;
     } else if (!emailPattern.test(emailValue)) {
       setEmailInvalid(true);
-      setEmailErr('メール形式が正しくありません。もう一度入力してください。');
+      setEmailErr('メール形式が正しくありません。');
       hasError = true;
     }
 
@@ -106,21 +101,28 @@ export default function RegisterPage() {
       hasError = true;
     }
 
-    // パスワードチェック
-    const FIXED_PASSWORD = 'Asdfqw123.!?';
+    // ✅ パスワードチェック（12文字以上 + 大写 + 小写 + 数字 + 記号）
+    const longEnough = pwValue.length >= 12;
+    const hasUpper = /[A-Z]/.test(pwValue);
+    const hasLower = /[a-z]/.test(pwValue);
+    const hasDigit = /[0-9]/.test(pwValue);
+    const hasSymbol = /[^A-Za-z0-9]/.test(pwValue);
+
     if (!pwValue) {
       setPasswordInvalid(true);
       setPasswordErr('パスワードを入力してください。');
       hasError = true;
-    } else if (pwValue !== FIXED_PASSWORD) {
+    } else if (!(longEnough && hasUpper && hasLower && hasDigit && hasSymbol)) {
       setPasswordInvalid(true);
-      setPasswordErr('パスワードが正しくありません。');
+      setPasswordErr(
+        'パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください。'
+      );
       hasError = true;
     }
 
     if (hasError) return;
 
-    // 全部OK → 跳转 /auth/login 并带上参数
+    // 全部OK → 登录页
     const params = new URLSearchParams({
       registered: '1',
       email: emailValue.toLowerCase(),
@@ -136,12 +138,10 @@ export default function RegisterPage() {
       </div>
 
       <main className="container">
-        {/* 左侧插画 */}
         <section className="hero">
           <img src="/pic/man.png" alt="バスケットボールのイラスト" />
         </section>
 
-        {/* 右侧：注册卡片 */}
         <section className="card">
           <div className="head">
             <span>ようこそ SWICH</span>
@@ -152,79 +152,57 @@ export default function RegisterPage() {
 
           <h1>新規登録</h1>
 
-          {/* 自定义验证，不用浏览器默认气泡 */}
-          <form ref={formRef} action="#" method="post" noValidate onSubmit={handleSubmit}>
-            {/* メール */}
+          <form ref={formRef} noValidate onSubmit={handleSubmit}>
             <div className="field">
-              <label htmlFor="email">メールアドレスを入力してください</label>
+              <label htmlFor="email">メールアドレス</label>
               <input
                 id="email"
-                name="email"
                 type="email"
                 className={`input ${emailInvalid ? 'is-invalid' : ''}`}
-                placeholder="メールアドレス"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
-              <p className="error" id="emailError">
-                {emailErr}
-              </p>
+              <p className="error">{emailErr}</p>
             </div>
 
-            {/* 名前 & 連絡方法 */}
             <div className="grid-2">
               <div className="field">
-                <label htmlFor="name">あなたの名前</label>
+                <label htmlFor="name">名前</label>
                 <input
                   id="name"
-                  name="name"
                   type="text"
                   className={`input ${nameInvalid ? 'is-invalid' : ''}`}
-                  placeholder="名前"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <p className="error" id="nameError">
-                  {nameErr}
-                </p>
+                <p className="error">{nameErr}</p>
               </div>
 
               <div className="field">
                 <label htmlFor="contact">連絡方法</label>
                 <input
                   id="contact"
-                  name="contact"
                   type="text"
                   className={`input ${contactInvalid ? 'is-invalid' : ''}`}
-                  placeholder="連絡方法"
                   value={contact}
                   onChange={(e) => setContact(e.target.value)}
                 />
-                <p className="error" id="contactError">
-                  {contactErr}
-                </p>
+                <p className="error">{contactErr}</p>
               </div>
             </div>
 
-            {/* パスワード */}
             <div className="field">
-              <label htmlFor="password">パスワードを入力してください</label>
+              <label htmlFor="password">パスワード</label>
               <input
                 id="password"
-                name="password"
                 type="password"
+                minLength={12}
+                placeholder="12文字以上（大文字・小文字・数字・記号）"
                 className={`input ${passwordInvalid ? 'is-invalid' : ''}`}
-                placeholder="パスワード"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <p className="error" id="passwordError">
-                {passwordErr}
-              </p>
-            </div>
-
-            <div className="actions">
-              <a href="#">パスワードを忘れます</a>
+              <p className="error">{passwordErr}</p>
             </div>
 
             <div className="submit-row">
@@ -235,6 +213,9 @@ export default function RegisterPage() {
           </form>
         </section>
       </main>
+    </>
+  );
+}
 
       <style jsx global>{`
         * {
