@@ -1,5 +1,134 @@
 'use client';
+
+import { useEffect, useRef, useState } from 'react';
+
 export default function RegisterPage() {
+  const LOGIN_URL = '/auth/login';
+
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const [password, setPassword] = useState('');
+
+  const [emailErr, setEmailErr] = useState('');
+  const [nameErr, setNameErr] = useState('');
+  const [contactErr, setContactErr] = useState('');
+  const [passwordErr, setPasswordErr] = useState('');
+
+  const [emailInvalid, setEmailInvalid] = useState(false);
+  const [nameInvalid, setNameInvalid] = useState(false);
+  const [contactInvalid, setContactInvalid] = useState(false);
+  const [passwordInvalid, setPasswordInvalid] = useState(false);
+
+  // 输入时自动清除红字
+  useEffect(() => {
+    if (emailErr && email.trim()) {
+      setEmailErr('');
+      setEmailInvalid(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
+  useEffect(() => {
+    if (nameErr && name.trim()) {
+      setNameErr('');
+      setNameInvalid(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name]);
+
+  useEffect(() => {
+    if (contactErr && contact.trim()) {
+      setContactErr('');
+      setContactInvalid(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contact]);
+
+  useEffect(() => {
+    if (passwordErr && password.trim()) {
+      setPasswordErr('');
+      setPasswordInvalid(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [password]);
+
+  function clearAllErrors() {
+    setEmailErr('');
+    setNameErr('');
+    setContactErr('');
+    setPasswordErr('');
+
+    setEmailInvalid(false);
+    setNameInvalid(false);
+    setContactInvalid(false);
+    setPasswordInvalid(false);
+  }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    clearAllErrors();
+
+    let hasError = false;
+
+    const emailValue = email.trim();
+    const nameValue = name.trim();
+    const contactValue = contact.trim();
+    const pwValue = password.trim();
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // メールチェック
+    if (!emailValue) {
+      setEmailInvalid(true);
+      setEmailErr('メールアドレスを入力してください。');
+      hasError = true;
+    } else if (!emailPattern.test(emailValue)) {
+      setEmailInvalid(true);
+      setEmailErr('メール形式が正しくありません。もう一度入力してください。');
+      hasError = true;
+    }
+
+    // 名前チェック
+    if (!nameValue) {
+      setNameInvalid(true);
+      setNameErr('名前を入力してください。');
+      hasError = true;
+    }
+
+    // 連絡方法チェック
+    if (!contactValue) {
+      setContactInvalid(true);
+      setContactErr('連絡方法を入力してください。');
+      hasError = true;
+    }
+
+    // パスワードチェック
+    const FIXED_PASSWORD = 'Asdfqw123.!?';
+    if (!pwValue) {
+      setPasswordInvalid(true);
+      setPasswordErr('パスワードを入力してください。');
+      hasError = true;
+    } else if (pwValue !== FIXED_PASSWORD) {
+      setPasswordInvalid(true);
+      setPasswordErr('パスワードが正しくありません。');
+      hasError = true;
+    }
+
+    if (hasError) return;
+
+    // 全部OK → 跳转 /auth/login 并带上参数
+    const params = new URLSearchParams({
+      registered: '1',
+      email: emailValue.toLowerCase(),
+    });
+
+    window.location.href = `${LOGIN_URL}?${params.toString()}`;
+  }
+
   return (
     <>
       <div className="logo-bar">
@@ -12,103 +141,101 @@ export default function RegisterPage() {
           <img src="/pic/man.png" alt="バスケットボールのイラスト" />
         </section>
 
-        {/* 右侧：纯白登录卡片 */}
+        {/* 右侧：注册卡片 */}
         <section className="card">
           <div className="head">
             <span>ようこそ SWICH</span>
             <span>
-              アカウントがありません？ <a href="signin.html">新規登録</a>
+              アカウントがあります？ <a href="/auth/login">ログイン</a>
             </span>
           </div>
 
-          <h1>ログイン</h1>
+          <h1>新規登録</h1>
 
-          <p
-            id="info"
-            style={{
-              display: "none",
-              color: "#065f46",
-              background: "#ecfdf5",
-              border: "1px solid #a7f3d0",
-              padding: "8px 12px",
-              borderRadius: 8,
-              margin: "-6px 0 6px",
-            }}
-          />
-
-          <form action="#" method="post">
-            {/* 第一栏：三个可点击的图片按钮 */}
-            <div className="icon-row">
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="google"
-                aria-label="Googleでログイン"
-              >
-                <img src="/pic/Google.png" alt="" />
-              </button>
-
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="github"
-                aria-label="GitHubでログイン"
-              >
-                <img src="/pic/fb.png" alt="" />
-              </button>
-
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="guest"
-                aria-label="ゲストで入る"
-              >
-                <img src="/pic/ios.png" alt="" />
-              </button>
-            </div>
-
-            {/* 邮箱 */}
+          {/* 自定义验证，不用浏览器默认气泡 */}
+          <form ref={formRef} action="#" method="post" noValidate onSubmit={handleSubmit}>
+            {/* メール */}
             <div className="field">
               <label htmlFor="email">メールアドレスを入力してください</label>
               <input
                 id="email"
                 name="email"
                 type="email"
-                className="input"
+                className={`input ${emailInvalid ? 'is-invalid' : ''}`}
                 placeholder="メールアドレス"
-                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
+              <p className="error" id="emailError">
+                {emailErr}
+              </p>
             </div>
 
-            {/* 密码 */}
+            {/* 名前 & 連絡方法 */}
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="name">あなたの名前</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  className={`input ${nameInvalid ? 'is-invalid' : ''}`}
+                  placeholder="名前"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <p className="error" id="nameError">
+                  {nameErr}
+                </p>
+              </div>
+
+              <div className="field">
+                <label htmlFor="contact">連絡方法</label>
+                <input
+                  id="contact"
+                  name="contact"
+                  type="text"
+                  className={`input ${contactInvalid ? 'is-invalid' : ''}`}
+                  placeholder="連絡方法"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                />
+                <p className="error" id="contactError">
+                  {contactErr}
+                </p>
+              </div>
+            </div>
+
+            {/* パスワード */}
             <div className="field">
               <label htmlFor="password">パスワードを入力してください</label>
               <input
                 id="password"
                 name="password"
                 type="password"
-                className="input"
+                className={`input ${passwordInvalid ? 'is-invalid' : ''}`}
                 placeholder="パスワード"
-                required
-                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
+              <p className="error" id="passwordError">
+                {passwordErr}
+              </p>
             </div>
 
             <div className="actions">
               <a href="#">パスワードを忘れます</a>
             </div>
 
-            {/* ✅ 登录按钮行：靠右 */}
             <div className="submit-row">
-              <button type="submit" className="btn">
-                ログイン
+              <button type="submit" className="btn signup-btn">
+                サインアップ
               </button>
             </div>
           </form>
         </section>
       </main>
 
-      {/* ✅ 把你原来的 CSS 直接粘过来：最稳 */}
       <style jsx global>{`
         * {
           box-sizing: border-box;
@@ -121,8 +248,7 @@ export default function RegisterPage() {
           margin: 0;
           background: #f0f0f1;
           color: #111;
-          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP",
-            Roboto, Arial;
+          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP", Roboto, Arial;
         }
 
         /* 左上角 LOGO（图片） */
@@ -138,7 +264,7 @@ export default function RegisterPage() {
           display: block;
         }
 
-        /* 主区域：左图 + 右登录卡片 */
+        /* 主区域：左图 + 右卡片 */
         .container {
           min-height: 100vh;
           display: flex;
@@ -160,22 +286,23 @@ export default function RegisterPage() {
           min-height: 320px;
         }
         .hero img {
-          width: 100%;
-          max-width: 780px;
+          width: 60%;
+          max-width: 380px;
           height: auto;
           display: block;
-          filter: drop-shadow(0 18px 30px rgba(0, 0, 0, 0.25));
-          transform: translateY(4px);
+          filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.18));
+          -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%);
+          mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%);
         }
 
-        /* 右侧登录卡片 */
+        /* 右侧卡片 */
         .card {
-          flex: 0 0 520px;
+          flex: 0 0 460px;
           background: #fff;
           border-radius: 22px;
-          padding: 32px;
+          padding: 28px;
           border: none;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+          box-shadow: none;
         }
 
         .head {
@@ -228,10 +355,9 @@ export default function RegisterPage() {
         }
         .input {
           width: 100%;
-          height: 48px;
           padding: 12px 14px;
           background: #fff;
-          border: 1.5px solid #e5e7eb;
+          border: 1px solid #d1d5db;
           border-radius: 12px;
           outline: none;
           transition: box-shadow 0.15s, border-color 0.15s;
@@ -255,83 +381,7 @@ export default function RegisterPage() {
           text-decoration: underline;
         }
 
-        /* 图标行 */
-        .card .icon-row {
-          display: grid;
-          grid-template-columns: 1fr 48px 48px;
-          gap: 10px;
-          width: 100%;
-          margin-bottom: 12px;
-        }
-
-        .card .img-btn {
-          flex: 0 0 auto;
-          width: 44px;
-          height: 44px;
-          padding: 6px;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          background: #fff;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .card .img-btn img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          display: block;
-        }
-        .card .img-btn:hover {
-          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
-          border-color: #d1d5db;
-        }
-        .card .img-btn:focus {
-          outline: none;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
-        }
-
-        .icon-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-wrap: nowrap;
-        }
-        .img-btn {
-          flex: 0 0 auto;
-          width: 44px;
-          height: 44px;
-          padding: 6px;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          background: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        }
-        .img-btn img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          display: block;
-        }
-        .icon-row .img-btn:first-child {
-          width: 100%;
-          height: 48px;
-          padding: 0 14px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: flex-start;
-          gap: 10px;
-        }
-        .icon-row .img-btn:first-child img {
-          width: auto;
-          height: 70%;
-        }
-
+        /* 小屏：上下布局 */
         @media (max-width: 960px) {
           .container {
             flex-direction: column;
@@ -346,33 +396,17 @@ export default function RegisterPage() {
             width: 66%;
             max-width: 320px;
           }
-          .icon-row .img-btn:first-child {
-            width: 200px;
-          }
         }
 
-        .hero img {
-          -webkit-mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 55%,
-            #000 75%,
-            transparent 100%
-          );
-          mask-image: radial-gradient(
-            ellipse 70% 60% at 50% 55%,
-            #000 75%,
-            transparent 100%
-          );
-        }
         .container,
         .stage {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 16px !important;
+          max-width: 1120px !important;
+          margin: 0 auto !important;
           min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 40px;
-          padding: 96px 40px 40px;
-          max-width: 1440px;
-          margin: 0 auto;
         }
         .hero {
           flex: 0 1 500px !important;
@@ -387,40 +421,70 @@ export default function RegisterPage() {
           margin-left: -6px;
         }
 
-        /* 登录按钮样式 */
-        .card form button.btn[type="submit"] {
-          background: #111 !important;
-          color: #fff !important;
-          border: 0 !important;
-          border-radius: 9999px !important;
-          padding: 14px 22px !important;
-          width: 40% !important;
-          max-width: 260px !important;
+        /* 错误提示文字 & 红框 */
+        .error {
+          color: #e11d48;
+          font-size: 12px;
+          margin-top: 6px;
+          min-height: 16px; /* 防止布局抖动 */
+        }
+        .input.is-invalid {
+          border-color: #ef4444;
+          box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+        }
+
+        .grid-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+        @media (max-width: 960px) {
+          .grid-2 {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        /* 按钮行：靠右 */
+        .submit-row {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 12px;
+        }
+
+        /* 黑色胶囊按钮 */
+        .signup-btn {
+          background: #111;
+          color: #fff;
+          border: 0;
+          border-radius: 9999px;
+          height: 48px;
+          padding: 0 28px;
           font-weight: 700;
           letter-spacing: 0.2px;
           box-shadow: 0 12px 22px rgba(0, 0, 0, 0.22);
           cursor: pointer;
           transition: background-color 0.15s, box-shadow 0.15s, transform 0.02s;
         }
-        .card form button.btn[type="submit"]:hover {
+        .signup-btn:hover {
           background: #000;
           box-shadow: 0 14px 26px rgba(0, 0, 0, 0.28);
         }
-        .card form button.btn[type="submit"]:active {
+        .signup-btn:active {
           transform: translateY(1px);
         }
-        .card form button.btn[type="submit"]:focus-visible {
+        .signup-btn:focus-visible {
           outline: none;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08),
-            0 12px 22px rgba(0, 0, 0, 0.22);
+          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08), 0 12px 22px rgba(0, 0, 0, 0.22);
         }
 
-        /* ✅ 按钮行：靠右 */
-        .submit-row {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 8px;
-          margin-right: 20px;
+        @media (max-width: 960px) {
+          .submit-row {
+            justify-content: center;
+          }
+          .signup-btn {
+            width: 100%;
+            max-width: 320px;
+          }
         }
       `}</style>
     </>
