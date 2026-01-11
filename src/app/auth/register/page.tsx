@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 
 export default function RegisterPage() {
   const LOGIN_URL = '/auth/login';
@@ -63,7 +63,7 @@ export default function RegisterPage() {
     setPasswordInvalid(false);
   }
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     clearAllErrors();
 
@@ -114,9 +114,7 @@ export default function RegisterPage() {
       hasError = true;
     } else if (!(longEnough && hasUpper && hasLower && hasDigit && hasSymbol)) {
       setPasswordInvalid(true);
-      setPasswordErr(
-        'パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください。'
-      );
+      setPasswordErr('パスワードは12文字以上で、大文字・小文字・数字・記号を含めてください。');
       hasError = true;
     }
 
@@ -213,10 +211,8 @@ export default function RegisterPage() {
           </form>
         </section>
       </main>
-    </>
-  );
-}
 
+      {/* ✅ style 必须在 return 里面 */}
       <style jsx global>{`
         * {
           box-sizing: border-box;
@@ -229,10 +225,10 @@ export default function RegisterPage() {
           margin: 0;
           background: #f0f0f1;
           color: #111;
-          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP", Roboto, Arial;
+          font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP",
+            Roboto, Arial;
         }
 
-        /* 左上角 LOGO（图片） */
         .logo-bar {
           position: fixed;
           top: 18px;
@@ -245,7 +241,6 @@ export default function RegisterPage() {
           display: block;
         }
 
-        /* 主区域：左图 + 右卡片 */
         .container {
           min-height: 100vh;
           display: flex;
@@ -254,11 +249,7 @@ export default function RegisterPage() {
           gap: -20px;
           padding: 60px 40px 40px;
         }
-        .card {
-          margin-left: -30px;
-        }
 
-        /* 左侧插画 */
         .hero {
           flex: 1 1 48%;
           display: flex;
@@ -272,11 +263,18 @@ export default function RegisterPage() {
           height: auto;
           display: block;
           filter: drop-shadow(0 16px 24px rgba(0, 0, 0, 0.18));
-          -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%);
-          mask-image: radial-gradient(ellipse 70% 60% at 50% 55%, #000 75%, transparent 100%);
+          -webkit-mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 55%,
+            #000 75%,
+            transparent 100%
+          );
+          mask-image: radial-gradient(
+            ellipse 70% 60% at 50% 55%,
+            #000 75%,
+            transparent 100%
+          );
         }
 
-        /* 右侧卡片 */
         .card {
           flex: 0 0 460px;
           background: #fff;
@@ -284,6 +282,7 @@ export default function RegisterPage() {
           padding: 28px;
           border: none;
           box-shadow: none;
+          margin-left: -6px;
         }
 
         .head {
@@ -321,7 +320,6 @@ export default function RegisterPage() {
           font-weight: 900;
         }
 
-        /* 表单 */
         form {
           display: grid;
           gap: 16px;
@@ -349,65 +347,11 @@ export default function RegisterPage() {
           box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.06);
         }
 
-        .actions {
-          display: flex;
-          justify-content: flex-end;
-          font-size: 12px;
-        }
-        .actions a {
-          color: #0a58ff;
-          text-decoration: none;
-        }
-        .actions a:hover {
-          text-decoration: underline;
-        }
-
-        /* 小屏：上下布局 */
-        @media (max-width: 960px) {
-          .container {
-            flex-direction: column;
-            gap: -10px;
-            padding: 100px 16px 32px;
-          }
-          .card {
-            width: 100%;
-            flex-basis: auto;
-          }
-          .hero img {
-            width: 66%;
-            max-width: 320px;
-          }
-        }
-
-        .container,
-        .stage {
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 16px !important;
-          max-width: 1120px !important;
-          margin: 0 auto !important;
-          min-height: 100vh;
-        }
-        .hero {
-          flex: 0 1 500px !important;
-        }
-        .hero img {
-          width: 100%;
-          max-width: 460px;
-          height: auto;
-        }
-        .card {
-          flex: 0 0 460px !important;
-          margin-left: -6px;
-        }
-
-        /* 错误提示文字 & 红框 */
         .error {
           color: #e11d48;
           font-size: 12px;
           margin-top: 6px;
-          min-height: 16px; /* 防止布局抖动 */
+          min-height: 16px;
         }
         .input.is-invalid {
           border-color: #ef4444;
@@ -420,19 +364,28 @@ export default function RegisterPage() {
           gap: 16px;
         }
         @media (max-width: 960px) {
+          .container {
+            flex-direction: column;
+            padding: 100px 16px 32px;
+          }
           .grid-2 {
             grid-template-columns: 1fr;
           }
+          .card {
+            width: 100%;
+          }
+          .hero img {
+            width: 66%;
+            max-width: 320px;
+          }
         }
 
-        /* 按钮行：靠右 */
         .submit-row {
           display: flex;
           justify-content: flex-end;
           margin-top: 12px;
         }
 
-        /* 黑色胶囊按钮 */
         .signup-btn {
           background: #111;
           color: #fff;
@@ -455,17 +408,8 @@ export default function RegisterPage() {
         }
         .signup-btn:focus-visible {
           outline: none;
-          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08), 0 12px 22px rgba(0, 0, 0, 0.22);
-        }
-
-        @media (max-width: 960px) {
-          .submit-row {
-            justify-content: center;
-          }
-          .signup-btn {
-            width: 100%;
-            max-width: 320px;
-          }
+          box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08),
+            0 12px 22px rgba(0, 0, 0, 0.22);
         }
       `}</style>
     </>
