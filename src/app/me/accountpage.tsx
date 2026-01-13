@@ -32,7 +32,7 @@ export default function AccountPage(): React.ReactElement {
       <h1>アカウント情報</h1>
 
     <AccountInfo
-  username={user?.username ?? user?.name ?? null}
+  username={user?.name ?? null}
   email={user?.email ?? null}
   passwordMasked={maskedPassword}
   onLogout={logout}
