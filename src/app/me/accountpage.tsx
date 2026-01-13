@@ -31,8 +31,12 @@ export default function AccountPage(): React.ReactElement {
     <main className="account-page">
       <h1>アカウント情報</h1>
 
-      {/* 旧版里有引入 AccountInfo（你截图第6行被删掉的那行） */}
-      <AccountInfo user={user} maskedPassword={maskedPassword} />
+    <AccountInfo
+  username={user?.username ?? user?.name ?? null}
+  email={user?.email ?? null}
+  passwordMasked={maskedPassword}
+  onLogout={logout}
+/>
 
       <button className="logout-btn" onClick={logout}>
         ログアウト
