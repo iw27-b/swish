@@ -9,43 +9,38 @@ type TabKey = "profile" | "favs" | "address" | "settings";
 
 export default function Page(): React.ReactElement {
   const router = useRouter();
-  const { user, isAuthenticated, loading, logout } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
 
-  // tabs
+  // tab state
   const [tab, setTab] = useState<TabKey>("profile");
 
   // password show/hide
   const [pwVisible, setPwVisible] = useState(false);
 
-  // 默认值：用登录用户信息填进去（没有就用示例）
+  // fill form with user info when logged in (fallback to your sample)
   const username = useMemo(() => user?.name ?? "ユーザー１", [user]);
   const email = useMemo(() => user?.email ?? "Jason@gmail.com", [user]);
 
-  // ✅ 未登录 → 去登录页
+  // ✅ 未登录 -> /auth/login
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.replace("/auth/login");
     }
   }, [loading, isAuthenticated, router]);
 
-  // loading
   if (loading) {
     return (
-      <main className="max-w-[1080px] mx-auto my-10 px-4">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
-        </div>
+      <main className="max-w-[1100px] mx-auto my-20 text-center">
+        <p>Loading...</p>
       </main>
     );
   }
 
-  // 未登录但还没跳走：避免白屏
+  // ✅ 未登录但还没跳走：给个提示，避免白屏
   if (!isAuthenticated) {
     return (
-      <main className="max-w-[1080px] mx-auto my-10 px-4">
-        <div className="flex justify-center items-center min-h-[400px]">
-          <p>ログイン画面へ移動しています…</p>
-        </div>
+      <main className="max-w-[1100px] mx-auto my-20 text-center">
+        <p>ログイン画面へ移動しています…</p>
       </main>
     );
   }
@@ -56,29 +51,29 @@ export default function Page(): React.ReactElement {
         {/* 左侧导航 */}
         <nav className="sidenav" aria-label="アカウントメニュー">
           <button
-            className={`nav-btn ${tab === "profile" ? "active" : ""}`}
             type="button"
+            className={`nav-btn ${tab === "profile" ? "active" : ""}`}
             onClick={() => setTab("profile")}
           >
             個人情報
           </button>
           <button
-            className={`nav-btn ${tab === "favs" ? "active" : ""}`}
             type="button"
+            className={`nav-btn ${tab === "favs" ? "active" : ""}`}
             onClick={() => setTab("favs")}
           >
             お気に入り
           </button>
           <button
-            className={`nav-btn ${tab === "address" ? "active" : ""}`}
             type="button"
+            className={`nav-btn ${tab === "address" ? "active" : ""}`}
             onClick={() => setTab("address")}
           >
             住所
           </button>
           <button
-            className={`nav-btn ${tab === "settings" ? "active" : ""}`}
             type="button"
+            className={`nav-btn ${tab === "settings" ? "active" : ""}`}
             onClick={() => setTab("settings")}
           >
             設定
@@ -133,7 +128,7 @@ export default function Page(): React.ReactElement {
             {[1, 2, 3].map((i) => (
               <article className="card" key={i}>
                 <div className="thumb">
-                  {/* ✅ public/pic/card.png → /pic/card.png */}
+                  {/* ✅ public/pic/card.png -> /pic/card.png */}
                   <img src="/pic/card.png" alt="カード画像" loading="lazy" />
                 </div>
 
@@ -208,6 +203,7 @@ export default function Page(): React.ReactElement {
             <div style={{ marginTop: 24 }}>
               <h2>サインアウト</h2>
 
+              {/* ✅ 你 HTML 里那张 avatar 我按你的 CSS 规则是要隐藏的，所以这里不放 */}
               <div className="actions">
                 <button className="btn" type="button" onClick={logout}>
                   サインアウト
@@ -218,6 +214,7 @@ export default function Page(): React.ReactElement {
         </section>
       </main>
 
+      {/* 原样保留你的 CSS（用 styled-jsx 放在组件里） */}
       <style jsx>{`
         :root {
           --bg: #ffffff;
@@ -244,7 +241,6 @@ export default function Page(): React.ReactElement {
           font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, Roboto, Arial;
         }
 
-        /* 左侧侧边栏 */
         .sidenav {
           display: flex;
           flex-direction: column;
@@ -271,7 +267,6 @@ export default function Page(): React.ReactElement {
           border-color: #111;
         }
 
-        /* 右侧内容容器 */
         .panel {
           display: none;
           animation: 0.18s ease fadein;
@@ -290,7 +285,6 @@ export default function Page(): React.ReactElement {
           }
         }
 
-        /* 标题、分组 */
         h2 {
           margin: 0 0 18px;
           font-size: 22px;
@@ -306,7 +300,6 @@ export default function Page(): React.ReactElement {
           gap: 14px;
         }
 
-        /* 输入与按钮 */
         label {
           font-weight: 700;
           font-size: 14px;
@@ -354,7 +347,6 @@ export default function Page(): React.ReactElement {
           margin-top: 20px;
         }
 
-        /* 密码输入（显示/隐藏） */
         .pw-wrap {
           position: relative;
         }
@@ -374,14 +366,11 @@ export default function Page(): React.ReactElement {
           font-size: 12px;
         }
 
-        /* お気に入り 列表样式 */
         .fav-list {
           display: grid;
           gap: 12px;
           max-width: 640px;
         }
-
-        /* 卡片整体 */
         .card {
           display: grid;
           grid-template-columns: 96px 1fr;
@@ -391,8 +380,6 @@ export default function Page(): React.ReactElement {
           border: 1px solid var(--border);
           border-radius: 20px;
         }
-
-        /* 缩略图：固定方形、圆角、溢出裁切 */
         .thumb {
           width: 96px;
           height: 96px;
@@ -401,15 +388,12 @@ export default function Page(): React.ReactElement {
           overflow: hidden;
           box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
         }
-
-        /* 图片等比填充 */
         .thumb img {
           width: 100%;
           height: 100%;
           object-fit: cover;
           display: block;
         }
-
         .meta {
           display: grid;
           gap: 6px;
@@ -432,7 +416,6 @@ export default function Page(): React.ReactElement {
           font-size: 13px;
         }
 
-        /* 响应式 */
         @media (max-width: 900px) {
           .wrap {
             grid-template-columns: 1fr;
@@ -443,7 +426,6 @@ export default function Page(): React.ReactElement {
           }
         }
 
-        /* settings：隐藏头像（保留你的原规则） */
         #p-settings img,
         #p-settings [class*="avatar"],
         #p-settings [data-avatar],
