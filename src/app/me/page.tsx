@@ -23,6 +23,14 @@ export default function Page(): React.ReactElement {
     }
   }, [loading, isAuthenticated, router]);
 
+  const handleLogout = async () => {
+    try {
+      await logout?.();
+    } finally {
+      router.replace("/auth/login");
+    }
+  };
+
   if (loading) {
     return (
       <main className="max-w-[1100px] mx-auto my-20 text-center">
@@ -254,7 +262,7 @@ export default function Page(): React.ReactElement {
                 <div className="flex justify-center">
                   <button
                     type="button"
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="h-12 w-[560px] max-w-[95vw] px-6 rounded-full bg-black text-white font-bold shadow-lg hover:shadow-xl active:translate-y-[1px]"
                   >
                     サインアウト
