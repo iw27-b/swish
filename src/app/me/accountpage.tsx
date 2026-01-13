@@ -83,4 +83,3 @@ export default function AccountPage(): React.ReactElement {
     </main>
   );
 }
-
