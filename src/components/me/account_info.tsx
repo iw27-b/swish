@@ -61,6 +61,7 @@ export default function AccountInfo({
       </div>
 
       <button
+        type="button"
         className="w-full px-6 py-3 bg-black text-white text-[16px] rounded-full cursor-pointer transition-all hover:bg-gray-800 shadow-[0_4px_12px_rgba(0,0,0,0.3)]"
         onClick={() => onLogout?.()}
       >
@@ -69,7 +70,3 @@ export default function AccountInfo({
     </div>
   );
 }
-
-
-
-
