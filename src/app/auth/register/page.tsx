@@ -370,7 +370,7 @@ export default function RegisterPage() {
                 name="password"
                 type="password"
                 className="input"
-                placeholder="12文字以上 / 英大小文字 + 数字 + 記号"
+                placeholder="パスワードは「12文字以上」かつ「英大文字・英小文字・数字・記号」を含めてください。"
               />
               <p className="error" id="passwordError"></p>
             </div>
