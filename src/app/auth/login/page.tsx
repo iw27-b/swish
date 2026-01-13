@@ -101,9 +101,9 @@ export default function LoginPage() {
           font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP", Roboto, Arial;
         }
 
-        /* 左上角 LOGO（图片） */
-        .logo-bar{ position:fixed; top:18px; left:28px; z-index:10 }
-        .logo-bar img{ width:120px; height:auto; display:block }
+        /* ✅ logo tweak：小さく + 少し右へ */
+        .logo-bar{ position:fixed; top:18px; left:44px; z-index:10 }
+        .logo-bar img{ width:90px; height:auto; display:block }
 
         /* 主区域：左图 + 右登录卡片 */
         .container{
@@ -262,6 +262,10 @@ export default function LoginPage() {
           .card{ width:100%; flex-basis:auto }
           .hero img{ width:66%; max-width:320px }
           .icon-row .img-btn:first-child{ width:200px; }
+
+          /* ✅ SPの時はロゴをさらに少し小さめ */
+          .logo-bar{ left:16px; top:14px; }
+          .logo-bar img{ width:76px; }
         }
 
         .hero img{
