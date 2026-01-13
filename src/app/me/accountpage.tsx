@@ -1,47 +1,106 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
-import React, { FormEvent, useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/client_auth";
-import AccountInfo from "@/components/me/account_info";
 
-export default function Page(): React.ReactElement {
-    const router = useRouter();
-    const { user, isAuthenticated, loading, logout } = useAuth();
+export default function AccountPage(): React.ReactElement {
+  const router = useRouter();
+  const { user, loading, isAuthenticated, logout } = useAuth();
 
-    useEffect(() => {
-        if (!loading && !isAuthenticated) {
-            router.replace("/auth/login");
-        }
-    }, [loading, isAuthenticated, router]);
-
-    const handleSubmit = async (_e: FormEvent<HTMLFormElement>) => {};
-
-    if (loading) {
-        return (
-            <main className="max-w-[1080px] mx-auto my-10 px-4">
-                <div className="flex justify-center items-center min-h-[400px]">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-            </main>
-        );
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/auth/login"); // ✅ 未登录去登录
     }
+  }, [loading, isAuthenticated, router]);
 
-    if (!isAuthenticated) {
-        return <main />;
-    }
+  const maskedPassword = useMemo(() => (user ? "••••••••" : ""), [user]);
 
+  if (loading) {
     return (
-        <main className="max-w-[1080px] mx-auto my-10 px-4">
-            <section className="flex justify-center items-center gap-[30px] md:flex-row flex-col">
-                <div className="flex flex-col items-start gap-[10px] md:items-start">
-                    <img src="/images/userformation/0.png" alt="左側画像1" className="block border-0 bg-transparent w-[280px] h-auto" />
-                    <img src="/images/userformation/1.png" alt="左側画像2" className="block border-0 bg-transparent w-[200px] h-auto" />
-                </div>
-                <div className="flex justify-start">
-                    <AccountInfo username={user?.name} email={user?.email} passwordMasked={user ? "••••••••" : ""} onLogout={logout} />
-                </div>
-            </section>
-        </main>
+      <main className="account-page">
+        <h1>アカウント情報</h1>
+        <p>読み込み中…</p>
+        <style jsx>{styles}</style>
+      </main>
     );
+  }
+
+  // ✅ 防止闪一下空白/错误渲染
+  if (!isAuthenticated) {
+    return (
+      <main className="account-page">
+        <h1>アカウント情報</h1>
+        <p>ログイン画面へ移動しています…</p>
+        <style jsx>{styles}</style>
+      </main>
+    );
+  }
+
+  return (
+    <main className="account-page">
+      <h1>アカウント情報</h1>
+
+      <div className="account-info">
+        <p>
+          <strong>ユーザー名前:</strong> {user?.name ?? ""}
+        </p>
+        <p>
+          <strong>メールアドレス:</strong> {user?.email ?? ""}
+        </p>
+        <p>
+          <strong>パスワード:</strong> {maskedPassword}
+        </p>
+      </div>
+
+      <button className="logout-btn" onClick={logout}>
+        ログアウト
+      </button>
+
+      <style jsx>{styles}</style>
+    </main>
+  );
 }
+
+const styles = `
+.account-page {
+  max-width: 600px;
+  margin: 60px auto;
+  padding: 0 16px;
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  text-align: center;
+}
+h1 {
+  font-size: 28px;
+  margin-bottom: 24px;
+}
+.account-info {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.account-info p {
+  font-size: 16px;
+  margin: 12px 0;
+}
+strong {
+  color: #333;
+}
+.logout-btn {
+  padding: 12px 24px;
+  background: #7b3cff;
+  color: white;
+  font-size: 16px;
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.logout-btn:hover {
+  background: #5d2fb5;
+}
+`;
