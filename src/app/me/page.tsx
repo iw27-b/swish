@@ -3,278 +3,287 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/client_auth";
 
 type TabKey = "profile" | "favs" | "address" | "settings";
 
 export default function Page(): React.ReactElement {
   const router = useRouter();
-  const { user, loading, isAuthenticated, logout } = useAuth();
 
   const [tab, setTab] = useState<TabKey>("profile");
   const [pwVisible, setPwVisible] = useState(false);
 
-  const username = useMemo(() => (user as any)?.name ?? "ユーザー１", [user]);
-  const email = useMemo(() => (user as any)?.email ?? "Jason@gmail.com", [user]);
+  // ✅ 临时展示数据（以后接你们真实 user 数据再改）
+  const username = useMemo(() => "ユーザー１", []);
+  const email = useMemo(() => "Jason@gmail.com", []);
 
+  // ✅ 兜底：没 cookie 就不让看 /me
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.replace("/auth/login");
-    }
-  }, [loading, isAuthenticated, router]);
+    const isLoggedIn = document.cookie.includes("auth=true");
+    if (!isLoggedIn) router.replace("/auth/login");
+  }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      await logout?.();
-    } finally {
-      router.replace("/auth/login");
-    }
+  const handleLogout = () => {
+    // 清 cookie（对应 middleware 里检查的 auth=true）
+    document.cookie = "auth=; path=/; max-age=0";
+    router.replace("/auth/login");
   };
-
-  if (loading) {
-    return (
-      <main className="max-w-[1100px] mx-auto my-20 text-center">
-        <p>Loading...</p>
-      </main>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <main className="max-w-[1100px] mx-auto my-20 text-center">
-        <p>ログイン画面へ移動しています…</p>
-      </main>
-    );
-  }
 
   const NavBtn = ({ k, label }: { k: TabKey; label: string }) => (
     <button
+      className={`nav-btn ${tab === k ? "active" : ""}`}
       type="button"
       onClick={() => setTab(k)}
-      className={[
-        "w-full text-left px-4 py-3 rounded-full font-semibold border border-dashed transition",
-        tab === k
-          ? "bg-black text-white border-black"
-          : "bg-white text-black border-neutral-200 hover:shadow-md",
-      ].join(" ")}
     >
       {label}
     </button>
   );
 
-  const Panel = ({ k, children }: { k: TabKey; children: React.ReactNode }) => (
-    <section className={tab === k ? "block animate-[fadein_.18s_ease]" : "hidden"}>
-      {children}
-    </section>
-  );
-
   return (
-    <main className="max-w-[1100px] mx-auto my-8 px-4">
-      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-10">
-        <nav className="flex flex-col gap-2" aria-label="アカウントメニュー">
-          <NavBtn k="profile" label="個人情報" />
-          <NavBtn k="favs" label="お気に入り" />
-          <NavBtn k="address" label="住所" />
-          <NavBtn k="settings" label="設定" />
-        </nav>
+    <main className="wrap">
+      {/* 左侧导航 */}
+      <nav className="sidenav" aria-label="アカウントメニュー">
+        <NavBtn k="profile" label="個人情報" />
+        <NavBtn k="favs" label="お気に入り" />
+        <NavBtn k="address" label="住所" />
+        <NavBtn k="settings" label="設定" />
+      </nav>
 
-        <div>
-          <Panel k="profile">
-            <div className="grid gap-4 max-w-[520px]">
-              <div className="grid gap-2">
-                <label htmlFor="name" className="font-bold text-sm">
-                  名前
-                </label>
-                <input
-                  id="name"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                  defaultValue={username}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <label htmlFor="email" className="font-bold text-sm">
-                  メールアドレス
-                </label>
-                <input
-                  id="email"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                  defaultValue={email}
-                />
-              </div>
-
-              <div className="grid gap-2 relative">
-                <label htmlFor="pw" className="font-bold text-sm">
-                  パスワード
-                </label>
-                <input
-                  id="pw"
-                  className="w-full h-11 px-3 pr-12 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                  type={pwVisible ? "text" : "password"}
-                  defaultValue="*****"
-                />
-                <button
-                  type="button"
-                  aria-label="パスワード表示切替"
-                  onClick={() => setPwVisible((v) => !v)}
-                  className="absolute right-2 top-[42px] w-7 h-7 rounded-full bg-white border border-neutral-200 grid place-items-center text-xs"
-                >
-                  👁
-                </button>
-              </div>
-
-              <div className="mt-5 flex justify-center">
-                <button
-                  type="button"
-                  className="h-12 min-w-[200px] px-6 rounded-full bg-black text-white font-bold shadow-lg hover:shadow-xl active:translate-y-[1px]"
-                >
-                  保存
-                </button>
-              </div>
+      {/* 右侧内容 */}
+      <div>
+        {/* 個人情報 */}
+        <section
+          id="p-profile"
+          className={`panel ${tab === "profile" ? "active" : ""}`}
+        >
+          <div className="section">
+            <div>
+              <label htmlFor="name">名前</label>
+              <input
+                id="name"
+                className="input"
+                placeholder="ユーザー１"
+                defaultValue={username}
+              />
             </div>
-          </Panel>
 
-          <Panel k="favs">
-            <h2 className="text-[22px] font-bold mb-4">お気に入り</h2>
-            <div className="grid gap-3 max-w-[640px]">
-              {[1, 2, 3].map((i) => (
-                <article
-                  key={i}
-                  className="grid grid-cols-[96px_1fr] gap-4 p-4 bg-white border border-neutral-200 rounded-2xl"
-                >
-                  <div className="w-24 h-24 rounded-[14px] bg-neutral-100 overflow-hidden shadow-md">
-                    <img
-                      src="/pic/card.png"
-                      alt="カード画像"
-                      className="w-full h-full object-cover block"
-                      loading="lazy"
-                    />
+            <div>
+              <label htmlFor="email">メールアドレス</label>
+              <input
+                id="email"
+                className="input"
+                placeholder="Jason@gmail.com"
+                defaultValue={email}
+              />
+            </div>
+
+            <div className="pw-wrap">
+              <label htmlFor="pw">パスワード</label>
+              <input
+                id="pw"
+                className="input"
+                type={pwVisible ? "text" : "password"}
+                defaultValue="*****"
+                aria-describedby="pwHelp"
+              />
+              <button
+                className="pw-toggle"
+                type="button"
+                aria-label="パスワード表示切替"
+                onClick={() => setPwVisible((v) => !v)}
+              >
+                👁
+              </button>
+            </div>
+
+            <div
+              className="actions"
+              style={{ display: "flex", justifyContent: "center" }}
+            >
+              <button className="btn" type="button">
+                保存
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* お気に入り */}
+        <section id="p-favs" className={`panel ${tab === "favs" ? "active" : ""}`}>
+          <h2>お気に入り</h2>
+          <div className="fav-list">
+            {[1, 2, 3].map((i) => (
+              <article className="card" key={i}>
+                <div className="thumb">
+                  <img src="https://via.placeholder.com/72x72" alt="" />
+                </div>
+                <div className="meta">
+                  <div className="title">
+                    2020 Lamelo Ball Sensational Auto #SS-LMB PSA 10 Rookie RC
                   </div>
-                  <div className="grid gap-1">
-                    <div className="font-bold">
-                      2020 Lamelo Ball Sensational Auto #SS-LMB PSA 10 Rookie RC
-                    </div>
-                    <div className="flex gap-4 items-center text-sm text-neutral-500">
-                      <span>◎ 1 点</span>
-                      <span className="font-extrabold text-black">US $34.99</span>
-                      <a className="underline" href="#">
-                        お気に入りから削除
-                      </a>
-                    </div>
+                  <div className="chip-row">
+                    <span>◎ 1 点</span>
+                    <span className="price">US $34.99</span>
+                    <a className="sub" href="#">
+                      お気に入りから削除
+                    </a>
                   </div>
-                </article>
-              ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* 住所 */}
+        <section
+          id="p-address"
+          className={`panel ${tab === "address" ? "active" : ""}`}
+        >
+          <div className="section" style={{ maxWidth: 640 }}>
+            <div>
+              <label htmlFor="country">国家</label>
+              <select id="country" className="select" defaultValue="日本">
+                <option>日本</option>
+                <option>中国</option>
+                <option>United States</option>
+              </select>
             </div>
-          </Panel>
 
-          <Panel k="address">
-            <div className="grid gap-4 max-w-[640px]">
-              <div className="grid gap-2">
-                <label htmlFor="country" className="font-bold text-sm">
-                  国家
-                </label>
-                <select
-                  id="country"
-                  defaultValue="日本"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                >
-                  <option>日本</option>
-                  <option>中国</option>
-                  <option>United States</option>
-                </select>
-              </div>
+            <div>
+              <label htmlFor="zip">郵便番号</label>
+              <input
+                id="zip"
+                className="input"
+                placeholder="1660002"
+                defaultValue="1660002"
+              />
+            </div>
 
-              <div className="grid gap-2">
-                <label htmlFor="zip" className="font-bold text-sm">
-                  郵便番号
-                </label>
+            <div className="row-2">
+              <div>
+                <label htmlFor="city">都市・区</label>
                 <input
-                  id="zip"
-                  defaultValue="1660002"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
+                  id="city"
+                  className="input"
+                  placeholder="東京・杉並区"
+                  defaultValue="東京・杉並区"
                 />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="grid gap-2">
-                  <label htmlFor="city" className="font-bold text-sm">
-                    都市・区
-                  </label>
-                  <input
-                    id="city"
-                    defaultValue="東京・杉並区"
-                    className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="block" className="font-bold text-sm">
-                    番地
-                  </label>
-                  <input
-                    id="block"
-                    defaultValue="4-32-9"
-                    className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <label htmlFor="addr" className="font-bold text-sm">
-                  住所
-                </label>
+              <div>
+                <label htmlFor="block">番地</label>
                 <input
-                  id="addr"
-                  defaultValue="ジュネス５ 303室"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
+                  id="block"
+                  className="input"
+                  placeholder="4-32-9"
+                  defaultValue="4-32-9"
                 />
               </div>
+            </div>
 
-              <div className="mt-5 flex justify-center">
-                <button
-                  type="button"
-                  className="h-12 min-w-[200px] px-6 rounded-full bg-black text-white font-bold shadow-lg hover:shadow-xl active:translate-y-[1px]"
-                >
-                  保存
+            <div>
+              <label htmlFor="addr">住所</label>
+              <input
+                id="addr"
+                className="input"
+                placeholder="ジュネス５ 303室"
+                defaultValue="ジュネス５ 303室"
+              />
+            </div>
+
+            <div
+              className="actions"
+              style={{ display: "flex", justifyContent: "center" }}
+            >
+              <button className="btn" type="button">
+                保存
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* 設定 */}
+        <section
+          id="p-settings"
+          className={`panel ${tab === "settings" ? "active" : ""}`}
+        >
+          <div className="section" style={{ maxWidth: 520 }}>
+            <div>
+              <label htmlFor="lang">言語</label>
+              <select id="lang" className="select" defaultValue="日本語">
+                <option>日本語</option>
+                <option>English</option>
+                <option>中文</option>
+              </select>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <h2>サインアウト</h2>
+              <div className="actions">
+                <button className="btn" type="button" onClick={handleLogout}>
+                  サインアウト
                 </button>
               </div>
             </div>
-          </Panel>
-
-          <Panel k="settings">
-            <div className="grid gap-4 max-w-[520px]">
-              <div className="grid gap-2">
-                <label htmlFor="lang" className="font-bold text-sm">
-                  言語
-                </label>
-                <select
-                  id="lang"
-                  defaultValue="日本語"
-                  className="w-full h-11 px-3 rounded-xl border border-neutral-200 bg-neutral-200/80 focus:outline-none focus:ring-4 focus:ring-black/10"
-                >
-                  <option>日本語</option>
-                  <option>English</option>
-                  <option>中文</option>
-                </select>
-              </div>
-
-              <div className="mt-6">
-                <h2 className="text-[22px] font-bold mb-4">サインアウト</h2>
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="h-12 w-[560px] max-w-[95vw] px-6 rounded-full bg-black text-white font-bold shadow-lg hover:shadow-xl active:translate-y-[1px]"
-                  >
-                    サインアウト
-                  </button>
-                </div>
-              </div>
-            </div>
-          </Panel>
-        </div>
+          </div>
+        </section>
       </div>
 
-      <style jsx global>{`
+      <style jsx>{`
+        :root {
+          --bg: #ffffff;
+          --muted: #6b7280;
+          --border: #e5e7eb;
+          --chip: #efefef;
+          --card: #ffffff;
+          --primary: #111111;
+          --radius: 14px;
+          --radius-lg: 24px;
+        }
+        * {
+          box-sizing: border-box;
+        }
+        .wrap {
+          max-width: 1100px;
+          margin: 32px auto;
+          padding: 0 16px;
+          display: grid;
+          grid-template-columns: 220px 1fr;
+          gap: 40px;
+        }
+
+        /* 左侧侧边栏 */
+        .sidenav {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .nav-btn {
+          width: 100%;
+          text-align: left;
+          padding: 12px 16px;
+          border: 1px dashed #e6e6e6;
+          border-radius: 9999px;
+          background: #fff;
+          color: #111;
+          cursor: pointer;
+          font-weight: 600;
+          transition: 0.15s box-shadow, 0.15s transform, 0.15s background;
+        }
+        .nav-btn:hover {
+          box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+        }
+        .nav-btn.active {
+          background: #111;
+          color: #fff;
+          border-color: #111;
+        }
+
+        /* 右侧内容容器 */
+        .panel {
+          display: none;
+          animation: 0.18s ease fadein;
+        }
+        .panel.active {
+          display: block;
+        }
         @keyframes fadein {
           from {
             opacity: 0.4;
@@ -285,7 +294,162 @@ export default function Page(): React.ReactElement {
             transform: none;
           }
         }
+
+        /* 标题、分组 */
+        h2 {
+          margin: 0 0 18px;
+          font-size: 22px;
+        }
+        .section {
+          display: grid;
+          gap: 14px;
+          max-width: 520px;
+        }
+        .row-2 {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 14px;
+        }
+
+        /* 输入与按钮 */
+        label {
+          font-weight: 700;
+          font-size: 14px;
+        }
+        .input,
+        .select {
+          width: 100%;
+          height: 44px;
+          padding: 10px 12px;
+          background: #ededed;
+          border: 1.5px solid var(--border);
+          border-radius: 12px;
+          outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .input:focus,
+        .select:focus {
+          border-color: #9ca3af;
+          box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.06);
+        }
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: 48px;
+          padding: 0 22px;
+          min-width: 200px;
+          background: var(--primary);
+          color: #fff;
+          border: 0;
+          border-radius: 9999px;
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
+          transition: 0.15s background, 0.15s box-shadow, 0.02s transform;
+        }
+        .btn:hover {
+          background: #000;
+          box-shadow: 0 14px 26px rgba(0, 0, 0, 0.22);
+        }
+        .btn:active {
+          transform: translateY(1px);
+        }
+        .actions {
+          margin-top: 20px;
+          display: flex;
+          justify-content: center;
+        }
+
+        /* 密码输入（显示/隐藏） */
+        .pw-wrap {
+          position: relative;
+        }
+        .pw-toggle {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: grid;
+          place-items: center;
+          border: 1px solid var(--border);
+          background: #fff;
+          cursor: pointer;
+          font-size: 12px;
+        }
+
+        /* お気に入り 列表样式 */
+        .fav-list {
+          display: grid;
+          gap: 12px;
+          max-width: 640px;
+        }
+        .card {
+          display: grid;
+          grid-template-columns: 72px 1fr;
+          gap: 12px;
+          padding: 12px;
+          background: #fff;
+          border: 1px solid var(--border);
+          border-radius: 20px;
+        }
+        .thumb {
+          width: 72px;
+          height: 72px;
+          border-radius: 14px;
+          background: #f3f3f3;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+        }
+        .thumb img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+        }
+        .meta {
+          display: grid;
+          gap: 6px;
+        }
+        .meta .title {
+          font-weight: 700;
+        }
+        .meta .sub {
+          color: var(--muted);
+          font-size: 13px;
+        }
+        .meta .price {
+          font-weight: 800;
+        }
+        .chip-row {
+          display: flex;
+          gap: 16px;
+          align-items: center;
+          color: var(--muted);
+          font-size: 13px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 900px) {
+          .wrap {
+            grid-template-columns: 1fr;
+            gap: 24px;
+          }
+          .row-2 {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        /* サインアウト按钮再拉长并居中 */
+        #p-settings .actions .btn {
+          width: 560px;
+          max-width: 95vw;
+        }
       `}</style>
     </main>
   );
 }
+
