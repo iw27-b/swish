@@ -27,8 +27,9 @@ export default function RegisterPage() {
       !pwErr ||
       !nameErr ||
       !contactErr
-    )
+    ) {
       return;
+    }
 
     function clearFieldError(inputEl: HTMLInputElement, errorEl: HTMLElement) {
       inputEl.classList.remove('is-invalid');
@@ -51,7 +52,14 @@ export default function RegisterPage() {
       const hasLower = /[a-z]/.test(p);
       const hasNumber = /[0-9]/.test(p);
       const hasSymbol = /[^A-Za-z0-9]/.test(p);
-      return { ok: longEnough && hasUpper && hasLower && hasNumber && hasSymbol, longEnough, hasUpper, hasLower, hasNumber, hasSymbol };
+      return {
+        ok: longEnough && hasUpper && hasLower && hasNumber && hasSymbol,
+        longEnough,
+        hasUpper,
+        hasLower,
+        hasNumber,
+        hasSymbol,
+      };
     }
 
     const onSubmit = (e: Event) => {
@@ -138,7 +146,6 @@ export default function RegisterPage() {
           font-family: ui-sans-serif, system-ui, -apple-system, "Noto Sans JP", Roboto, Arial;
         }
 
-        /* ✅ logo（login と同一） */
         .logo-bar{
           position:fixed;
           top:18px;
@@ -151,7 +158,6 @@ export default function RegisterPage() {
           display:block;
         }
 
-        /* 主区域 */
         .container{
           min-height:100vh;
           display:flex;
@@ -160,7 +166,6 @@ export default function RegisterPage() {
           padding:60px 40px 40px;
         }
 
-        /* 左侧插画 */
         .hero{
           flex:1;
           display:flex;
@@ -173,7 +178,6 @@ export default function RegisterPage() {
           filter:drop-shadow(0 16px 24px rgba(0,0,0,.18));
         }
 
-        /* 右侧卡片 */
         .card{
           flex:0 0 460px;
           background:#fff;
@@ -219,7 +223,6 @@ export default function RegisterPage() {
           font-weight:700;
         }
 
-        /* ✅ SP */
         @media (max-width: 960px){
           .container{
             flex-direction:column;
@@ -246,22 +249,74 @@ export default function RegisterPage() {
 
         <section className="card">
           <h1>新規登録</h1>
-          <form action="#" method="post" noValidate> {/* メール */} <div className="field"> 
-            <label htmlFor="email">メールアドレスを入力してください</label> <input id="email" name="email" type="email" className="input" placeholder="メールアドレス" />
-            <p className="error" id="emailError"></p> </div> {/* 名前 & 連絡方法 */} <div className="grid-2">
-              <div className="field"> <label htmlFor="name">あなたの名前</label>
-                <input id="name" name="name" type="text" className="input" placeholder="名前" /> 
-                <p className="error" id="nameError"></p> </div> <div className="field"> 
-                  <label htmlFor="contact">連絡方法</label> <input id="contact" name="contact" type="text" className="input" placeholder="連絡方法" /> 
-                  <p className="error" id="contactError"></p> </div> </div> {/* パスワード */} <div className="field"> <label htmlFor="password">パスワードを入力してください</label>
-                    <input id="password" name="password" type="password" className="input" placeholder="パスワードは「12文字以上」かつ「英大文字・英小文字・数字・記号」を含めてください。" /> 
-                    <p className="error" id="passwordError"></p> </div> <div className="actions"> <a href="#">パスワードを忘れます</a> </div> <div className="submit-row"> <button type="submit" className="btn signup-btn">サインアップ</button> 
-                    </div> </form>
+
+          <form action="#" method="post" noValidate>
+            {/* メール */}
+            <div className="field">
+              <label htmlFor="email">メールアドレスを入力してください</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                className="input"
+                placeholder="メールアドレス"
+              />
+              <p className="error" id="emailError"></p>
+            </div>
+
+            {/* 名前 & 連絡方法 */}
+            <div className="grid-2">
+              <div className="field">
+                <label htmlFor="name">あなたの名前</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  className="input"
+                  placeholder="名前"
+                />
+                <p className="error" id="nameError"></p>
+              </div>
+
+              <div className="field">
+                <label htmlFor="contact">連絡方法</label>
+                <input
+                  id="contact"
+                  name="contact"
+                  type="text"
+                  className="input"
+                  placeholder="連絡方法"
+                />
+                <p className="error" id="contactError"></p>
+              </div>
+            </div>
+
+            {/* パスワード */}
+            <div className="field">
+              <label htmlFor="password">パスワードを入力してください</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                className="input"
+                placeholder="パスワードは「12文字以上」かつ「英大文字・英小文字・数字・記号」を含めてください。"
+              />
+              <p className="error" id="passwordError"></p>
+            </div>
+
+            <div className="actions">
+              <a href="#">パスワードを忘れます</a>
+            </div>
+
+            <div className="submit-row">
+              <button type="submit" className="btn signup-btn">
+                サインアップ
+              </button>
+            </div>
+          </form>
         </section>
       </main>
     </>
-  );
-}
   );
 }
 
