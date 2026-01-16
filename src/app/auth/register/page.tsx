@@ -246,7 +246,43 @@ export default function RegisterPage() {
 
         <section className="card">
           <h1>新規登録</h1>
-          {/* フォームはそのまま */}
+         
+  <form>
+    <div className="field">
+      <label htmlFor="name">名前</label>
+      <input id="name" className="input" placeholder="ユーザー１" />
+      <div id="nameError" className="error"></div>
+    </div>
+
+    <div className="field">
+      <label htmlFor="email">メールアドレス</label>
+      <input id="email" className="input" placeholder="example@gmail.com" />
+      <div id="emailError" className="error"></div>
+    </div>
+
+    <div className="field">
+      <label htmlFor="password">パスワード</label>
+      <input
+        id="password"
+        className="input"
+        type="password"
+        placeholder="12文字以上（英大/英小/数字/記号）"
+      />
+      <div id="passwordError" className="error"></div>
+    </div>
+
+    <div className="field">
+      <label htmlFor="contact">連絡方法</label>
+      <input id="contact" className="input" placeholder="090-xxxx-xxxx" />
+      <div id="contactError" className="error"></div>
+    </div>
+
+    <div className="submit-row">
+      <button className="signup-btn" type="submit">
+        登録
+      </button>
+    </div>
+  </form>
         </section>
       </main>
     </>
