@@ -452,4 +452,3 @@ export default function Page(): React.ReactElement {
     </main>
   );
 }
-
