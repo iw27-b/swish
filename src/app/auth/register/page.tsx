@@ -246,46 +246,22 @@ export default function RegisterPage() {
 
         <section className="card">
           <h1>新規登録</h1>
-         
-  <form>
-    <div className="field">
-      <label htmlFor="name">名前</label>
-      <input id="name" className="input" placeholder="ユーザー１" />
-      <div id="nameError" className="error"></div>
-    </div>
-
-    <div className="field">
-      <label htmlFor="email">メールアドレス</label>
-      <input id="email" className="input" placeholder="example@gmail.com" />
-      <div id="emailError" className="error"></div>
-    </div>
-
-    <div className="field">
-      <label htmlFor="password">パスワード</label>
-      <input
-        id="password"
-        className="input"
-        type="password"
-        placeholder="12文字以上（英大/英小/数字/記号）"
-      />
-      <div id="passwordError" className="error"></div>
-    </div>
-
-    <div className="field">
-      <label htmlFor="contact">連絡方法</label>
-      <input id="contact" className="input" placeholder="090-xxxx-xxxx" />
-      <div id="contactError" className="error"></div>
-    </div>
-
-    <div className="submit-row">
-      <button className="signup-btn" type="submit">
-        登録
-      </button>
-    </div>
-  </form>
+          <form action="#" method="post" noValidate> {/* メール */} <div className="field"> 
+            <label htmlFor="email">メールアドレスを入力してください</label> <input id="email" name="email" type="email" className="input" placeholder="メールアドレス" />
+            <p className="error" id="emailError"></p> </div> {/* 名前 & 連絡方法 */} <div className="grid-2">
+              <div className="field"> <label htmlFor="name">あなたの名前</label>
+                <input id="name" name="name" type="text" className="input" placeholder="名前" /> 
+                <p className="error" id="nameError"></p> </div> <div className="field"> 
+                  <label htmlFor="contact">連絡方法</label> <input id="contact" name="contact" type="text" className="input" placeholder="連絡方法" /> 
+                  <p className="error" id="contactError"></p> </div> </div> {/* パスワード */} <div className="field"> <label htmlFor="password">パスワードを入力してください</label>
+                    <input id="password" name="password" type="password" className="input" placeholder="パスワードは「12文字以上」かつ「英大文字・英小文字・数字・記号」を含めてください。" /> 
+                    <p className="error" id="passwordError"></p> </div> <div className="actions"> <a href="#">パスワードを忘れます</a> </div> <div className="submit-row"> <button type="submit" className="btn signup-btn">サインアップ</button> 
+                    </div> </form>
         </section>
       </main>
     </>
+  );
+}
   );
 }
 
