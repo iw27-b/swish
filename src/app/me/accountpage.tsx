@@ -11,7 +11,8 @@ export default function AccountPage(): React.ReactElement {
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      router.replace('me');
+      // ✅ 未登录就去登录页，并带 next 回来
+      router.replace('/auth/login?next=/me');
     }
   }, [loading, isAuthenticated, router]);
 
@@ -31,12 +32,12 @@ export default function AccountPage(): React.ReactElement {
     <main className="account-page">
       <h1>アカウント情報</h1>
 
-    <AccountInfo
-  username={user?.name ?? null}
-  email={user?.email ?? null}
-  passwordMasked={maskedPassword}
-  onLogout={logout}
-/>
+      <AccountInfo
+        username={user?.name ?? null}
+        email={user?.email ?? null}
+        passwordMasked={maskedPassword}
+        onLogout={logout}
+      />
 
       <button className="logout-btn" onClick={logout}>
         ログアウト
@@ -54,21 +55,6 @@ export default function AccountPage(): React.ReactElement {
         h1 {
           font-size: 28px;
           margin-bottom: 24px;
-        }
-        .account-info {
-          background: #f9f9f9;
-          border: 1px solid #ddd;
-          border-radius: 12px;
-          padding: 24px;
-          margin-bottom: 20px;
-          text-align: left;
-        }
-        .account-info p {
-          font-size: 16px;
-          margin: 12px 0;
-        }
-        strong {
-          color: #333;
         }
         .logout-btn {
           padding: 12px 24px;
