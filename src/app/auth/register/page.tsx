@@ -17,6 +17,9 @@ export default function RegisterPage() {
     const nameErr = document.getElementById('nameError') as HTMLElement | null;
     const contactErr = document.getElementById('contactError') as HTMLElement | null;
 
+    // ✅ 新增：全局错误显示区域
+    const formErr = document.getElementById('formError') as HTMLElement | null;
+
     if (
       !form ||
       !email ||
@@ -26,7 +29,8 @@ export default function RegisterPage() {
       !emailErr ||
       !pwErr ||
       !nameErr ||
-      !contactErr
+      !contactErr ||
+      !formErr
     ) {
       return;
     }
@@ -67,6 +71,9 @@ export default function RegisterPage() {
 
     const onSubmit = async (e: Event)  => {
       e.preventDefault();
+
+      // ✅ 新增：每次提交先清空全局错误
+      formErr.textContent = '';
 
       // 每次提交先清空错误
       clearFieldError(email, emailErr);
@@ -158,8 +165,9 @@ export default function RegisterPage() {
           const msg =
             (data && (data.message || data.error)) ||
             `登録に失敗しました（${res.status}）`;
-          contactEl.classList.add('is-invalid');
-          contactErr.textContent = msg;
+
+          // ✅ 改动：错误显示到全局，不再把 contact 标红
+          formErr.textContent = msg;
           return;
         }
 
@@ -170,8 +178,8 @@ export default function RegisterPage() {
         });
         window.location.href = `${LOGIN_URL}?${params.toString()}`;
       } catch (err) {
-        contactEl.classList.add('is-invalid');
-        contactErr.textContent = '通信エラーが発生しました。もう一度試してください。';
+        // ✅ 改动：网络错误也显示到全局
+        formErr.textContent = '通信エラーが発生しました。もう一度試してください。';
         return;
       }
     };
@@ -340,6 +348,9 @@ export default function RegisterPage() {
             <div className="submit-row">
               <button type="submit" className="signup-btn">サインアップ</button>
             </div>
+
+            {/* ✅ 新增：全局错误显示（后端限流/服务器错误在这里显示） */}
+            <p className="error" id="formError"></p>
           </form>
         </section>
       </main>
