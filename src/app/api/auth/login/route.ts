@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
     // ⚠️ 这里我保持你的原写法不主动改逻辑：
     // 你原代码是 verifyPassword(user.password, password)
     // 如果你库函数签名是 verifyPassword(plain, hashed) 或反过来，这里可能要调整
-    const isPasswordValid = await verifyPassword(user.password, password);
+    const isPasswordValid = await verifyPassword(password, user.password);
 
     if (!isPasswordValid) {
       recordFailedAttempt(clientIP);
