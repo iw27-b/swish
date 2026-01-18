@@ -35,7 +35,9 @@ export async function OPTIONS(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
-    // ✅ 关键：动态 import，避免 build 阶段就加载 '@/lib/auth' 顶层检查
+    const isProd = process.env.NODE_ENV === 'production';
+
+    // ✅ 动态 import，避免 build 阶段就加载 '@/lib/auth' 顶层检查
     const {
       verifyPassword,
       generateToken,
@@ -111,11 +113,22 @@ export async function POST(req: NextRequest) {
       return setCorsHeaders(response, origin);
     }
 
+    // ✅ Debug: 基础信息（不包含密码）
+    if (!isProd) {
+      console.log('[LOGIN] attempt', {
+        email: sanitized,
+        ip: clientIP,
+        origin,
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { email: sanitized },
     });
 
     if (!user) {
+      if (!isProd) console.log('[LOGIN] user not found', { email: sanitized });
+
       recordFailedAttempt(clientIP);
       logAuditEvent({
         action: 'LOGIN_USER_NOT_FOUND',
@@ -129,8 +142,23 @@ export async function POST(req: NextRequest) {
       return setCorsHeaders(response, origin);
     }
 
-    // ✅ 你现在这个顺序：verifyPassword(plain, hashed)
+    // ✅ Debug: 看数据库里 password 到底是不是 bcrypt hash
+    if (!isProd) {
+      const pwHash = String(user.password ?? '');
+      console.log('[LOGIN] user found', {
+        userId: user.id,
+        // bcrypt 通常以 $2a$ / $2b$ / $2y$ 开头，长度一般 60 左右
+        hashPrefix: pwHash.slice(0, 4),
+        hashLen: pwHash.length,
+      });
+    }
+
+    // ✅ verifyPassword(hashedPassword, plainPassword)  ← 你 lib/auth.ts 是这么定义的
     const isPasswordValid = await verifyPassword(user.password, password);
+
+    if (!isProd) {
+      console.log('[LOGIN] password valid?', { userId: user.id, isPasswordValid });
+    }
 
     if (!isPasswordValid) {
       recordFailedAttempt(clientIP);
@@ -161,15 +189,10 @@ export async function POST(req: NextRequest) {
       timestamp: new Date(),
     });
 
-    const response = createSuccessResponse(
-      { loginSuccess: true, csrfToken },
-      'Login successful'
-    );
+    const response = createSuccessResponse({ loginSuccess: true, csrfToken }, 'Login successful');
 
-    // ✅ Vercel/代理环境：用 x-forwarded-proto 判断是否 https
     const isHttps = req.headers.get('x-forwarded-proto') === 'https';
 
-    // ✅ 同域应用：sameSite 用 lax 最稳，避免 cookie 被吞导致 me/refresh 一直 401
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
       secure: isHttps,
