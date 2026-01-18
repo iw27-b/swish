@@ -9,11 +9,18 @@ export default function LoginPage(): React.ReactElement {
   const [infoText, setInfoText] = useState('');
   const [showInfo, setShowInfo] = useState(false);
 
-  // ✅ 把你原来的 <script> 改成 useEffect
+  // ✅ 登录成功后要回去的页面
+  const [nextPath, setNextPath] = useState('/');
+
+  // ✅ 读取 URL 参数：email / registered / next
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
+
     const emailParam = qs.get('email') || '';
     const registered = qs.get('registered');
+    const next = qs.get('next') || '/';
+
+    setNextPath(next);
 
     if (emailParam) setEmail(emailParam);
 
@@ -23,12 +30,35 @@ export default function LoginPage(): React.ReactElement {
     }
   }, []);
 
+  // ✅ provider 模拟登录：登录成功后回 nextPath
+  const onProviderLogin = (provider: string) => {
+    localStorage.setItem('swish_logged_in', '1');
+    localStorage.setItem('swish_provider', provider);
+
+    const currentEmail = (email || '').trim().toLowerCase();
+    if (currentEmail) localStorage.setItem('swish_email', currentEmail);
+
+    window.location.href = nextPath;
+  };
+
+  // ✅ 表单登录：登录成功后回 nextPath
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 这里保留空逻辑：你后续接 API 再写
-    // 暂时就防止页面刷新
-    // console.log({ email, password });
+    const emailValue = email.trim();
+    const pwValue = password; // 不 trim
+
+    // 简单邮箱校验（和你之前一致）
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailValue || !emailPattern.test(emailValue)) return;
+    if (!pwValue) return;
+
+    // ✅ 模拟登录成功（你后续接 API 就替换这里）
+    localStorage.setItem('swish_logged_in', '1');
+    localStorage.setItem('swish_email', emailValue.toLowerCase());
+
+    // ✅ 关键：回到“点 login 的页面”
+    window.location.href = nextPath;
   };
 
   return (
@@ -289,13 +319,33 @@ export default function LoginPage(): React.ReactElement {
 
           <form onSubmit={onSubmit}>
             <div className="icon-row">
-              <button type="button" className="img-btn" data-provider="google" aria-label="Googleでログイン">
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="google"
+                aria-label="Googleでログイン"
+                onClick={() => onProviderLogin('google')}
+              >
                 <img src="/pic/Google.png" alt="" />
               </button>
-              <button type="button" className="img-btn" data-provider="github" aria-label="GitHubでログイン">
+
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="github"
+                aria-label="GitHubでログイン"
+                onClick={() => onProviderLogin('github')}
+              >
                 <img src="/pic/fb.png" alt="" />
               </button>
-              <button type="button" className="img-btn" data-provider="guest" aria-label="ゲストで入る">
+
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="guest"
+                aria-label="ゲストで入る"
+                onClick={() => onProviderLogin('guest')}
+              >
                 <img src="/pic/ios.png" alt="" />
               </button>
             </div>
@@ -344,4 +394,5 @@ export default function LoginPage(): React.ReactElement {
     </>
   );
 }
+
 
