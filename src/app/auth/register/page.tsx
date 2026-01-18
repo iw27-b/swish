@@ -64,7 +64,7 @@ export default function RegisterPage() {
       };
     }
 
-    const onSubmit = (e: Event) => {
+   const onSubmit = async (e: Event)  => {
       e.preventDefault();
 
       // 每次提交先清空错误
