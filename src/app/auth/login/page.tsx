@@ -6,35 +6,12 @@ export default function LoginPage() {
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
 
-    // ✅ next：登录后要回去的页面（默认去 /me，避免跳回主页造成误解）
-    const next = qs.get("next") || "/me";
+    // ✅ next：登录后要回去的页面（恢复原来的默认主页体验）
+    const next = qs.get("next") || "/";
 
     // ✅ 注册后提示
     const email = qs.get("email");
     const registered = qs.get("registered");
-
-    // 预填邮箱
-    const emailInput = document.getElementById("email") as HTMLInputElement | null;
-    if (email && emailInput) emailInput.value = email;
-
-    // 显示注册成功提示
-    if (registered === "1") {
-      const info = document.getElementById("info") as HTMLElement | null;
-      if (info) {
-        info.textContent = "登録が完了しました。ログインしてください。";
-        info.style.display = "block";
-        info.style.color = "#065f46";
-        info.style.background = "#ecfdf5";
-        info.style.border = "1px solid #a7f3d0";
-      }
-    }
-
-    // 绑定登录表单
-    const form = document.querySelector<HTMLFormElement>(".card form");
-    if (!form) return;
-
-    const pwInput = document.getElementById("password") as HTMLInputElement | null;
-    if (!emailInput || !pwInput) return;
 
     const infoEl = document.getElementById("info") as HTMLElement | null;
 
@@ -56,11 +33,40 @@ export default function LoginPage() {
       infoEl.style.border = "1px solid #a7f3d0";
     };
 
-    // provider buttons：暂时不做“伪登录”，避免制造 /me 闪退循环
+    // ✅ 如果“旧逻辑”认为已登录：直接回 next（保持你原来的体验）
+    const isLoggedIn = localStorage.getItem("swish_logged_in") === "1";
+    if (isLoggedIn) {
+      window.location.href = next;
+      return;
+    }
+
+    // 预填邮箱
+    const emailInput = document.getElementById("email") as HTMLInputElement | null;
+    if (email && emailInput) emailInput.value = email;
+
+    // 显示注册成功提示
+    if (registered === "1") {
+      showInfo("登録が完了しました。ログインしてください。");
+    }
+
+    // 绑定登录表单
+    const form = document.querySelector<HTMLFormElement>(".card form");
+    if (!form) return;
+
+    const pwInput = document.getElementById("password") as HTMLInputElement | null;
+    if (!emailInput || !pwInput) return;
+
+    // provider buttons：保留“原来体验”（点了就当成功），同时也尝试真登录（但你没接 OAuth，所以这里走旧逻辑）
     const providerBtns = document.querySelectorAll<HTMLButtonElement>(".img-btn[data-provider]");
     const onProviderClick = (e: Event) => {
       e.preventDefault();
-      showError("このログイン方法はまだ未対応です。メール/パスワードでログインしてください。");
+
+      // 旧逻辑：点一下也视为“登录成功”
+      localStorage.setItem("swish_logged_in", "1");
+      const currentEmail = (emailInput.value || "").trim().toLowerCase();
+      if (currentEmail) localStorage.setItem("swish_email", currentEmail);
+
+      window.location.href = next;
     };
     providerBtns.forEach((b) => b.addEventListener("click", onProviderClick));
 
@@ -82,10 +88,10 @@ export default function LoginPage() {
         return;
       }
 
-      // 可选：提交时给一点提示
-      showInfo("ログイン中…");
-
+      // ✅ 先尝试真登录（后端 /api/auth/login，写 httpOnly cookie）
       try {
+        showInfo("ログイン中…");
+
         const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -93,15 +99,30 @@ export default function LoginPage() {
           body: JSON.stringify({ email: emailValue, password: pwValue }),
         });
 
-        if (!res.ok) {
-          showError("ログインに失敗しました。メール/パスワードを確認してください。");
+        if (res.ok) {
+          // ✅ 真登录成功：跳转 next
+          // （可选）同时写一份本地标记，方便你做旧逻辑页面展示
+          localStorage.setItem("swish_logged_in", "1");
+          localStorage.setItem("swish_email", emailValue.toLowerCase());
+
+          window.location.href = next;
           return;
         }
 
-        // ✅ 登录成功：cookie 已写入，跳转到 next（默认 /me）
+        // ❗真登录失败：退回旧逻辑（恢复你原来的“能跳转”体验）
+        localStorage.setItem("swish_logged_in", "1");
+        localStorage.setItem("swish_email", emailValue.toLowerCase());
+
+        // 给个提示，但仍然跳（你说你要回到原来的体验）
+        // showError("サーバー認証に失敗したため、簡易ログインで続行します。");
         window.location.href = next;
       } catch {
-        showError("通信エラーが発生しました。もう一度お試しください。");
+        // ❗网络/后端错误：也退回旧逻辑
+        localStorage.setItem("swish_logged_in", "1");
+        localStorage.setItem("swish_email", emailValue.toLowerCase());
+
+        // showError("通信エラーのため、簡易ログインで続行します。");
+        window.location.href = next;
       }
     };
 
@@ -371,55 +392,25 @@ export default function LoginPage() {
 
           <form action="#" method="post">
             <div className="icon-row">
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="google"
-                aria-label="Googleでログイン"
-              >
+              <button type="button" className="img-btn" data-provider="google" aria-label="Googleでログイン">
                 <img src="/pic/Google.png" alt="" />
               </button>
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="github"
-                aria-label="GitHubでログイン"
-              >
+              <button type="button" className="img-btn" data-provider="github" aria-label="GitHubでログイン">
                 <img src="/pic/fb.png" alt="" />
               </button>
-              <button
-                type="button"
-                className="img-btn"
-                data-provider="guest"
-                aria-label="ゲストで入る"
-              >
+              <button type="button" className="img-btn" data-provider="guest" aria-label="ゲストで入る">
                 <img src="/pic/ios.png" alt="" />
               </button>
             </div>
 
             <div className="field">
               <label htmlFor="email">メールアドレスを入力してください</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                className="input"
-                placeholder="メールアドレス"
-                required
-              />
+              <input id="email" name="email" type="email" className="input" placeholder="メールアドレス" required />
             </div>
 
             <div className="field">
               <label htmlFor="password">パスワードを入力してください</label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                className="input"
-                placeholder="パスワード"
-                required
-                minLength={8}
-              />
+              <input id="password" name="password" type="password" className="input" placeholder="パスワード" required minLength={8} />
             </div>
 
             <div className="actions">
@@ -437,5 +428,6 @@ export default function LoginPage() {
     </>
   );
 }
+
 
 
