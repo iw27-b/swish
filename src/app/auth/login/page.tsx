@@ -1,93 +1,115 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 export default function LoginPage() {
   useEffect(() => {
     const qs = new URLSearchParams(window.location.search);
 
-    // ✅ next：登录后要回去的页面
-    const next = qs.get('next') || '/';
+    // ✅ next：登录后要回去的页面（默认去 /me，避免跳回主页造成误解）
+    const next = qs.get("next") || "/me";
 
     // ✅ 注册后提示
-    const email = qs.get('email');
-    const registered = qs.get('registered');
-
-    // 如果已登录：直接回 next（“保持”体验）
-    const isLoggedIn = localStorage.getItem('swish_logged_in') === '1';
-    if (isLoggedIn) {
-      window.location.href = next;
-      return;
-    }
+    const email = qs.get("email");
+    const registered = qs.get("registered");
 
     // 预填邮箱
-    if (email) {
-      const emailInput = document.getElementById('email') as HTMLInputElement | null;
-      if (emailInput) emailInput.value = email;
-    }
+    const emailInput = document.getElementById("email") as HTMLInputElement | null;
+    if (email && emailInput) emailInput.value = email;
 
     // 显示注册成功提示
-    if (registered === '1') {
-      const info = document.getElementById('info') as HTMLElement | null;
+    if (registered === "1") {
+      const info = document.getElementById("info") as HTMLElement | null;
       if (info) {
-        info.textContent = '登録が完了しました。ログインしてください。';
-        info.style.display = 'block';
+        info.textContent = "登録が完了しました。ログインしてください。";
+        info.style.display = "block";
+        info.style.color = "#065f46";
+        info.style.background = "#ecfdf5";
+        info.style.border = "1px solid #a7f3d0";
       }
     }
 
-    // 绑定登录表单：成功后写 localStorage 并跳回 next
-    const form = document.querySelector<HTMLFormElement>('.card form');
+    // 绑定登录表单
+    const form = document.querySelector<HTMLFormElement>(".card form");
     if (!form) return;
 
-    const emailInput = document.getElementById('email') as HTMLInputElement | null;
-    const pwInput = document.getElementById('password') as HTMLInputElement | null;
+    const pwInput = document.getElementById("password") as HTMLInputElement | null;
     if (!emailInput || !pwInput) return;
 
-    // icon buttons（不改变布局，只做演示）
-    const providerBtns = document.querySelectorAll<HTMLButtonElement>('.img-btn[data-provider]');
-    const onProviderClick = (e: Event) => {
-      const btn = e.currentTarget as HTMLButtonElement;
-      const provider = btn.dataset.provider || '';
-      // 这里先做简单模拟：点一下也视为“登录成功”
-      localStorage.setItem('swish_logged_in', '1');
-      localStorage.setItem('swish_provider', provider);
-      const currentEmail = (emailInput.value || '').trim().toLowerCase();
-      if (currentEmail) localStorage.setItem('swish_email', currentEmail);
-      window.location.href = next;
-    };
-    providerBtns.forEach((b) => b.addEventListener('click', onProviderClick));
+    const infoEl = document.getElementById("info") as HTMLElement | null;
 
-    const onSubmit = (e: Event) => {
+    const showError = (msg: string) => {
+      if (!infoEl) return;
+      infoEl.textContent = msg;
+      infoEl.style.display = "block";
+      infoEl.style.color = "#b91c1c";
+      infoEl.style.background = "#fef2f2";
+      infoEl.style.border = "1px solid #fecaca";
+    };
+
+    const showInfo = (msg: string) => {
+      if (!infoEl) return;
+      infoEl.textContent = msg;
+      infoEl.style.display = "block";
+      infoEl.style.color = "#065f46";
+      infoEl.style.background = "#ecfdf5";
+      infoEl.style.border = "1px solid #a7f3d0";
+    };
+
+    // provider buttons：暂时不做“伪登录”，避免制造 /me 闪退循环
+    const providerBtns = document.querySelectorAll<HTMLButtonElement>(".img-btn[data-provider]");
+    const onProviderClick = (e: Event) => {
+      e.preventDefault();
+      showError("このログイン方法はまだ未対応です。メール/パスワードでログインしてください。");
+    };
+    providerBtns.forEach((b) => b.addEventListener("click", onProviderClick));
+
+    const onSubmit = async (e: Event) => {
       e.preventDefault();
 
       const emailValue = emailInput.value.trim();
       const pwValue = pwInput.value; // 不 trim
 
-      // 你原本用 required/minlength，这里再补一个简单邮箱格式验证
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
       if (!emailValue || !emailPattern.test(emailValue)) {
         emailInput.focus();
+        showError("メールアドレスの形式が正しくありません。");
         return;
       }
       if (!pwValue) {
         pwInput.focus();
+        showError("パスワードを入力してください。");
         return;
       }
 
-      // ✅ “保持登录”
-      localStorage.setItem('swish_logged_in', '1');
-      localStorage.setItem('swish_email', emailValue.toLowerCase());
+      // 可选：提交时给一点提示
+      showInfo("ログイン中…");
 
-      // ✅ 登录后回到 next
-      window.location.href = next;
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include", // ⭐关键：让 Set-Cookie 生效
+          body: JSON.stringify({ email: emailValue, password: pwValue }),
+        });
+
+        if (!res.ok) {
+          showError("ログインに失敗しました。メール/パスワードを確認してください。");
+          return;
+        }
+
+        // ✅ 登录成功：cookie 已写入，跳转到 next（默认 /me）
+        window.location.href = next;
+      } catch {
+        showError("通信エラーが発生しました。もう一度お試しください。");
+      }
     };
 
-    form.addEventListener('submit', onSubmit);
+    form.addEventListener("submit", onSubmit);
 
     return () => {
-      providerBtns.forEach((b) => b.removeEventListener('click', onProviderClick));
-      form.removeEventListener('submit', onSubmit);
+      providerBtns.forEach((b) => b.removeEventListener("click", onProviderClick));
+      form.removeEventListener("submit", onSubmit);
     };
   }, []);
 
@@ -337,25 +359,40 @@ export default function LoginPage() {
           <p
             id="info"
             style={{
-              display: 'none',
-              color: '#065f46',
-              background: '#ecfdf5',
-              border: '1px solid #a7f3d0',
-              padding: '8px 12px',
-              borderRadius: '8px',
-              margin: '-6px 0 6px',
+              display: "none",
+              color: "#065f46",
+              background: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              padding: "8px 12px",
+              borderRadius: "8px",
+              margin: "-6px 0 6px",
             }}
           ></p>
 
           <form action="#" method="post">
             <div className="icon-row">
-              <button type="button" className="img-btn" data-provider="google" aria-label="Googleでログイン">
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="google"
+                aria-label="Googleでログイン"
+              >
                 <img src="/pic/Google.png" alt="" />
               </button>
-              <button type="button" className="img-btn" data-provider="github" aria-label="GitHubでログイン">
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="github"
+                aria-label="GitHubでログイン"
+              >
                 <img src="/pic/fb.png" alt="" />
               </button>
-              <button type="button" className="img-btn" data-provider="guest" aria-label="ゲストで入る">
+              <button
+                type="button"
+                className="img-btn"
+                data-provider="guest"
+                aria-label="ゲストで入る"
+              >
                 <img src="/pic/ios.png" alt="" />
               </button>
             </div>
