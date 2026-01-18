@@ -129,9 +129,7 @@ export async function POST(req: NextRequest) {
       return setCorsHeaders(response, origin);
     }
 
-    // ⚠️ 这里我保持你的原写法不主动改逻辑：
-    // 你原代码是 verifyPassword(user.password, password)
-    // 如果你库函数签名是 verifyPassword(plain, hashed) 或反过来，这里可能要调整
+    // ✅ 你现在这个顺序：verifyPassword(plain, hashed)
     const isPasswordValid = await verifyPassword(password, user.password);
 
     if (!isPasswordValid) {
@@ -168,25 +166,27 @@ export async function POST(req: NextRequest) {
       'Login successful'
     );
 
-    const isProduction = process.env.NODE_ENV === 'production';
+    // ✅ Vercel/代理环境：用 x-forwarded-proto 判断是否 https
+    const isHttps = req.headers.get('x-forwarded-proto') === 'https';
 
+    // ✅ 同域应用：sameSite 用 lax 最稳，避免 cookie 被吞导致 me/refresh 一直 401
     response.cookies.set('access_token', accessToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps,
+      sameSite: 'lax',
       maxAge: 15 * 60,
       path: '/',
     });
 
     response.cookies.set('refresh_token', refreshToken, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'none' : 'lax',
+      secure: isHttps,
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
 
-    setCsrfCookie(response, csrfToken, isProduction);
+    setCsrfCookie(response, csrfToken, isHttps);
 
     return setCorsHeaders(response, origin);
   } catch (error) {
@@ -195,3 +195,4 @@ export async function POST(req: NextRequest) {
     return setCorsHeaders(response, req.headers.get('origin'));
   }
 }
+
