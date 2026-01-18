@@ -17,10 +17,16 @@ export default function Page(): React.ReactElement {
   const email = useMemo(() => "Jason@gmail.com", []);
 
   // ✅ 兜底：没 cookie 就不让看 /me
-  useEffect(() => {
-    const isLoggedIn = document.cookie.includes("auth=true");
-    if (!isLoggedIn) router.replace("/auth/login");
-  }, [router]);
+useEffect(() => {
+  (async () => {
+    try {
+      const res = await fetch("/api/me", { credentials: "include" }); // ⭐关键
+      if (res.status === 401) router.replace("/auth/login");
+    } catch {
+      router.replace("/auth/login");
+    }
+  })();
+}, [router]);
 
   const handleLogout = () => {
     // 清 cookie（对应 middleware 里检查的 auth=true）
