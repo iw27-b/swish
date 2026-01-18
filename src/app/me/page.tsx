@@ -11,28 +11,59 @@ export default function Page(): React.ReactElement {
 
   const [tab, setTab] = useState<TabKey>("profile");
   const [pwVisible, setPwVisible] = useState(false);
+  const [checking, setChecking] = useState(true);
 
-  // ✅ 临时展示数据（以后接你们真实 user 数据再改）
+  // 临时展示数据（之后可以从 /api/auth/me 返回的 user 接）
   const username = useMemo(() => "ユーザー１", []);
   const email = useMemo(() => "Jason@gmail.com", []);
 
-  // ✅ 兜底：没 cookie 就不让看 /me
-useEffect(() => {
-  (async () => {
+  /**
+   * ✅ 用 withAuth 保护的 API 来判断是否已登录
+   * 成功：停在 /me
+   * 失败：跳 /auth/login
+   */
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include", // ⭐ 必须：带 cookie
+        });
+
+        if (res.status === 401) {
+          router.replace("/auth/login");
+          return;
+        }
+
+        if (!res.ok) {
+          router.replace("/auth/login");
+          return;
+        }
+
+        setChecking(false);
+      } catch {
+        router.replace("/auth/login");
+      }
+    })();
+  }, [router]);
+
+  /**
+   * ✅ 正确的 logout：让服务器清 httpOnly cookie
+   */
+  const handleLogout = async () => {
     try {
-      const res = await fetch("/api/me", { credentials: "include" }); // ⭐关键
-      if (res.status === 401) router.replace("/auth/login");
-    } catch {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
       router.replace("/auth/login");
     }
-  })();
-}, [router]);
-
-  const handleLogout = () => {
-    // 清 cookie（对应 middleware 里检查的 auth=true）
-    document.cookie = "auth=; path=/; max-age=0";
-    router.replace("/auth/login");
   };
+
+  if (checking) {
+    return <main style={{ padding: 40 }}>Loading...</main>;
+  }
 
   const NavBtn = ({ k, label }: { k: TabKey; label: string }) => (
     <button
