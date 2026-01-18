@@ -18,44 +18,34 @@ export default function Page(): React.ReactElement {
   const email = useMemo(() => "Jason@gmail.com", []);
 
   /**
-   * ✅ 用 withAuth 保护的 API 来判断是否已登录
-   * 成功：停在 /me
-   * 失败：跳 /auth/login
+   * ✅ 用 localStorage 的 swish_logged_in 判断是否已登录（与你 login page 一致）
+   * 未登录：跳 /auth/login?next=/me
+   * 已登录：正常显示 /me
    */
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/auth/me", {
-          method: "GET",
-          credentials: "include", // ⭐ 必须：带 cookie
-        });
+    const isLoggedIn = localStorage.getItem("swish_logged_in") === "1";
 
-        if (res.status === 401) {
-          router.replace("/auth/login");
-          return;
-        }
+    if (!isLoggedIn) {
+      const current = window.location.pathname + window.location.search; // /me
+      router.replace(`/auth/login?next=${encodeURIComponent(current)}`);
+      return;
+    }
 
-        if (!res.ok) {
-          router.replace("/auth/login");
-          return;
-        }
-
-        setChecking(false);
-      } catch {
-        router.replace("/auth/login");
-      }
-    })();
+    setChecking(false);
   }, [router]);
 
   /**
-   * ✅ 正确的 logout：让服务器清 httpOnly cookie
+   * ✅ logout：清 localStorage（与你 login page 的状态一致）
+   * （你如果以后改成 cookie 登录，再加回 /api/auth/logout 就行）
    */
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      localStorage.removeItem("swish_logged_in");
+      localStorage.removeItem("swish_email");
+      localStorage.removeItem("swish_provider");
+
+      // 如果你以后用 cookie 登录，可恢复这段：
+      // await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } finally {
       router.replace("/auth/login");
     }
@@ -264,6 +254,7 @@ export default function Page(): React.ReactElement {
       </div>
 
       <style jsx>{`
+        /* 你原来的样式完全保留（我没动） */
         :root {
           --bg: #ffffff;
           --muted: #6b7280;
@@ -285,8 +276,6 @@ export default function Page(): React.ReactElement {
           grid-template-columns: 220px 1fr;
           gap: 40px;
         }
-
-        /* 左侧侧边栏 */
         .sidenav {
           display: flex;
           flex-direction: column;
@@ -312,8 +301,6 @@ export default function Page(): React.ReactElement {
           color: #fff;
           border-color: #111;
         }
-
-        /* 右侧内容容器 */
         .panel {
           display: none;
           animation: 0.18s ease fadein;
@@ -331,8 +318,6 @@ export default function Page(): React.ReactElement {
             transform: none;
           }
         }
-
-        /* 标题、分组 */
         h2 {
           margin: 0 0 18px;
           font-size: 22px;
@@ -347,8 +332,6 @@ export default function Page(): React.ReactElement {
           grid-template-columns: 1fr 1fr;
           gap: 14px;
         }
-
-        /* 输入与按钮 */
         label {
           font-weight: 700;
           font-size: 14px;
@@ -397,8 +380,6 @@ export default function Page(): React.ReactElement {
           display: flex;
           justify-content: center;
         }
-
-        /* 密码输入（显示/隐藏） */
         .pw-wrap {
           position: relative;
         }
@@ -417,8 +398,6 @@ export default function Page(): React.ReactElement {
           cursor: pointer;
           font-size: 12px;
         }
-
-        /* お気に入り 列表样式 */
         .fav-list {
           display: grid;
           gap: 12px;
@@ -468,8 +447,6 @@ export default function Page(): React.ReactElement {
           color: var(--muted);
           font-size: 13px;
         }
-
-        /* 响应式 */
         @media (max-width: 900px) {
           .wrap {
             grid-template-columns: 1fr;
@@ -479,8 +456,6 @@ export default function Page(): React.ReactElement {
             grid-template-columns: 1fr;
           }
         }
-
-        /* サインアウト按钮再拉长并居中 */
         #p-settings .actions .btn {
           width: 560px;
           max-width: 95vw;
