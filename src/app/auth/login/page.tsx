@@ -9,8 +9,12 @@ export default function LoginPage(): React.ReactElement {
   const [infoText, setInfoText] = useState('');
   const [showInfo, setShowInfo] = useState(false);
 
-  // ✅ 登录成功后要回去的页面
-  const [nextPath, setNextPath] = useState('/');
+  // ✅ 登录成功后要回去的页面（默认去 /me）
+  const [nextPath, setNextPath] = useState('/me');
+
+  // ✅ 错误提示
+  const [errorText, setErrorText] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
 
   // ✅ 读取 URL 参数：email / registered / next
   useEffect(() => {
@@ -18,7 +22,7 @@ export default function LoginPage(): React.ReactElement {
 
     const emailParam = qs.get('email') || '';
     const registered = qs.get('registered');
-    const next = qs.get('next') || '/';
+    const next = qs.get('next') || '/me';
 
     setNextPath(next);
 
@@ -28,37 +32,114 @@ export default function LoginPage(): React.ReactElement {
       setInfoText('登録が完了しました。ログインしてください。');
       setShowInfo(true);
     }
+
+    // ✅ 如果已经登录（有 cookie），就别停在 login，直接回 next
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (res.ok) {
+          window.location.replace(next);
+        }
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
-  // ✅ provider 模拟登录：登录成功后回 nextPath
-  const onProviderLogin = (provider: string) => {
-    localStorage.setItem('swish_logged_in', '1');
-    localStorage.setItem('swish_provider', provider);
+  // ✅ provider：暂时也走同一个后端登录流程（真实项目应跳 OAuth）
+  const onProviderLogin = async (provider: string) => {
+    setErrorText('');
+    setSubmitting(true);
 
-    const currentEmail = (email || '').trim().toLowerCase();
-    if (currentEmail) localStorage.setItem('swish_email', currentEmail);
+    try {
+      // 如果你后端没有 provider 登录接口，这里会失败（这是正常的）
+      // 你可以之后把它换成：window.location.href = `/api/auth/oauth/${provider}?next=...`
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          // 这里先传 provider，让后端有机会识别（如果后端不支持会忽略/报错）
+          provider,
+          email: (email || '').trim(),
+          password,
+        }),
+      });
 
-    window.location.href = nextPath;
+      if (!res.ok) {
+        let msg = `ログインに失敗しました（${provider}）`;
+        try {
+          const data = await res.json();
+          if (data?.error) msg = data.error;
+          if (data?.message) msg = data.message;
+        } catch {}
+        setErrorText(msg);
+        return;
+      }
+
+      // ✅ 登录成功：服务器已 set-cookie
+      window.location.href = nextPath;
+    } catch {
+      setErrorText('ネットワークエラー。もう一度お試しください。');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  // ✅ 表单登录：登录成功后回 nextPath
-  const onSubmit = (e: React.FormEvent) => {
+  // ✅ 表单登录：调用后端 /api/auth/login 设置 cookie
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorText('');
 
     const emailValue = email.trim();
     const pwValue = password; // 不 trim
 
-    // 简单邮箱校验（和你之前一致）
+    // 简单邮箱校验（保留你的）
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailValue || !emailPattern.test(emailValue)) return;
-    if (!pwValue) return;
+    if (!emailValue || !emailPattern.test(emailValue)) {
+      setErrorText('メールアドレスの形式が正しくありません。');
+      return;
+    }
+    if (!pwValue) {
+      setErrorText('パスワードを入力してください。');
+      return;
+    }
 
-    // ✅ 模拟登录成功（你后续接 API 就替换这里）
-    localStorage.setItem('swish_logged_in', '1');
-    localStorage.setItem('swish_email', emailValue.toLowerCase());
+    setSubmitting(true);
 
-    // ✅ 关键：回到“点 login 的页面”
-    window.location.href = nextPath;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include', // ✅ 关键：接收 & 发送 cookie
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailValue, password: pwValue }),
+      });
+
+      if (!res.ok) {
+        let msg = 'ログインに失敗しました。';
+        try {
+          const data = await res.json();
+          if (data?.error) msg = data.error;
+          if (data?.message) msg = data.message;
+        } catch {}
+        setErrorText(msg);
+        return;
+      }
+
+      // ✅ （可选）你如果还想在前端也留一份状态，OK，但真正鉴权还是 cookie
+      localStorage.setItem('swish_logged_in', '1');
+      localStorage.setItem('swish_email', emailValue.toLowerCase());
+
+      // ✅ 回到“点 login 的页面”（没 next 就去 /me）
+      window.location.href = nextPath;
+    } catch {
+      setErrorText('ネットワークエラー。もう一度お試しください。');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -138,7 +219,6 @@ export default function LoginPage(): React.ReactElement {
 
         h1{ margin:6px 0 22px; font-size:36px; line-height:1.1; font-weight:900 }
 
-        /* 表单 */
         form{ display:grid; gap:16px }
         .field{ display:grid; gap:8px }
         label{ font-weight:700; font-size:14px }
@@ -161,7 +241,6 @@ export default function LoginPage(): React.ReactElement {
         .actions a{ color:#0a58ff; text-decoration:none }
         .actions a:hover{ text-decoration:underline }
 
-        /* 图标行 */
         .card .icon-row{
           display:grid;
           grid-template-columns: 1fr 48px 48px;
@@ -192,46 +271,10 @@ export default function LoginPage(): React.ReactElement {
         .card .img-btn:hover{ box-shadow:0 6px 14px rgba(0,0,0,.10); border-color:#d1d5db; }
         .card .img-btn:focus{ outline:none; box-shadow:0 0 0 3px rgba(17,17,17,.08); }
 
-        .icon-row{
-          display:flex;
-          align-items:center;
-          gap:10px;
-          flex-wrap:nowrap;
-        }
-        .img-btn{
-          flex:0 0 auto;
-          width:44px;
-          height:44px;
-          padding:6px;
-          border:1px solid #e5e7eb;
-          border-radius:12px;
-          background:#fff;
-          display:flex; align-items:center; justify-content:center;
-          cursor:pointer;
-        }
-        .img-btn img{
-          width:100%; height:100%; object-fit:contain; display:block;
-        }
-        .icon-row .img-btn:first-child{
-          width:100%;
-          height:48px;
-          padding:0 14px;
-          border-radius:12px;
-          display:flex;
-          align-items:center;
-          justify-content:flex-start;
-          gap:10px;
-        }
-        .icon-row .img-btn:first-child img{
-          width:auto;
-          height:70%;
-        }
-
         @media (max-width: 960px){
           .container{ flex-direction:column; gap:-10px; padding:100px 16px 32px }
           .card{ width:100%; flex-basis:auto }
           .hero img{ width:66%; max-width:320px }
-          .icon-row .img-btn:first-child{ width:200px; }
         }
 
         .hero img{
@@ -252,7 +295,6 @@ export default function LoginPage(): React.ReactElement {
         .hero img{ width:100%; max-width:460px; height:auto; }
         .card{ flex:0 0 460px !important; margin-left:-6px; }
 
-        /* 登录按钮样式 */
         .card form button.btn[type="submit"]{
           background:#111 !important;
           color:#fff !important;
@@ -273,7 +315,6 @@ export default function LoginPage(): React.ReactElement {
           outline:none; box-shadow:0 0 0 3px rgba(17,17,17,.08), 0 12px 22px rgba(0,0,0,.22);
         }
 
-        /* ✅ 按钮行：靠右 */
         .submit-row{
           display:flex;
           justify-content:flex-end;
@@ -303,7 +344,6 @@ export default function LoginPage(): React.ReactElement {
 
           {showInfo && (
             <p
-              id="info"
               style={{
                 color: '#065f46',
                 background: '#ecfdf5',
@@ -317,14 +357,29 @@ export default function LoginPage(): React.ReactElement {
             </p>
           )}
 
+          {errorText && (
+            <p
+              style={{
+                color: '#b91c1c',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                margin: '0 0 10px',
+              }}
+            >
+              {errorText}
+            </p>
+          )}
+
           <form onSubmit={onSubmit}>
             <div className="icon-row">
               <button
                 type="button"
                 className="img-btn"
-                data-provider="google"
                 aria-label="Googleでログイン"
                 onClick={() => onProviderLogin('google')}
+                disabled={submitting}
               >
                 <img src="/pic/Google.png" alt="" />
               </button>
@@ -332,9 +387,9 @@ export default function LoginPage(): React.ReactElement {
               <button
                 type="button"
                 className="img-btn"
-                data-provider="github"
                 aria-label="GitHubでログイン"
                 onClick={() => onProviderLogin('github')}
+                disabled={submitting}
               >
                 <img src="/pic/fb.png" alt="" />
               </button>
@@ -342,9 +397,9 @@ export default function LoginPage(): React.ReactElement {
               <button
                 type="button"
                 className="img-btn"
-                data-provider="guest"
                 aria-label="ゲストで入る"
                 onClick={() => onProviderLogin('guest')}
+                disabled={submitting}
               >
                 <img src="/pic/ios.png" alt="" />
               </button>
@@ -384,8 +439,8 @@ export default function LoginPage(): React.ReactElement {
             </div>
 
             <div className="submit-row">
-              <button type="submit" className="btn">
-                ログイン
+              <button type="submit" className="btn" disabled={submitting}>
+                {submitting ? '...' : 'ログイン'}
               </button>
             </div>
           </form>
@@ -394,5 +449,3 @@ export default function LoginPage(): React.ReactElement {
     </>
   );
 }
-
-
