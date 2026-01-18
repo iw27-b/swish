@@ -42,24 +42,52 @@ export default function LoginPage(): React.ReactElement {
   };
 
   // ✅ 表单登录：登录成功后回 nextPath
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+const onSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    const emailValue = email.trim();
-    const pwValue = password; // 不 trim
+  const emailValue = email.trim();
+  const pwValue = password;
 
-    // 简单邮箱校验（和你之前一致）
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailValue || !emailPattern.test(emailValue)) return;
-    if (!pwValue) return;
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailValue || !emailPattern.test(emailValue)) {
+    alert('メールアドレスが正しくありません');
+    return;
+  }
+  if (!pwValue) {
+    alert('パスワードを入力してください');
+    return;
+  }
 
-    // ✅ 模拟登录成功（你后续接 API 就替换这里）
-    localStorage.setItem('swish_logged_in', '1');
-    localStorage.setItem('swish_email', emailValue.toLowerCase());
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    redirect: 'manual', // ✅ 很重要：避免你没看到后端在重定向导致 cookie 没按预期写入
+    body: JSON.stringify({ email: emailValue, password: pwValue }),
+  });
 
-    // ✅ 关键：回到“点 login 的页面”
-    window.location.href = nextPath;
-  };
+  // 如果后端返回 3xx，fetch 在 manual 下会是 opaqueredirect / 或 status=0（浏览器实现差异）
+  // 所以我们只要不是明确失败，就继续做一次 /api/users/me 验证
+  if (res.status >= 400) {
+    let msg = 'ログイン失敗';
+    try {
+      const j = await res.json();
+      if (j?.error) msg = j.error;
+    } catch {}
+    alert(msg);
+    return;
+  }
+
+  // ✅ 关键：立刻用 /api/users/me 验证 cookie 是否真的生效
+  const meRes = await fetch('/api/users/me', { credentials: 'include' });
+  if (!meRes.ok) {
+    alert('ログインは成功したように見えますが、認証Cookieが保存されていません（/me が 401）。');
+    return;
+  }
+
+  // ✅ 登录状态已被后端 cookie 记住
+  window.location.href = nextPath && nextPath !== '/auth/login' ? nextPath : '/me';
+};
 
   return (
     <>
