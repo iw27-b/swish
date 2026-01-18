@@ -218,4 +218,3 @@ export async function POST(req: NextRequest) {
     return setCorsHeaders(response, req.headers.get('origin'));
   }
 }
-
