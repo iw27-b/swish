@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ 你现在这个顺序：verifyPassword(plain, hashed)
-    const isPasswordValid = await verifyPassword(password, user.password);
+    const isPasswordValid = await verifyPassword(user.password, password);
 
     if (!isPasswordValid) {
       recordFailedAttempt(clientIP);
