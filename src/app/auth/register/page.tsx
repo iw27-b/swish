@@ -27,8 +27,9 @@ export default function RegisterPage() {
       !pwErr ||
       !nameErr ||
       !contactErr
-    )
+    ) {
       return;
+    }
 
     // 清除某个字段的错误显示
     function clearFieldError(inputEl: HTMLInputElement, errorEl: HTMLElement) {
@@ -64,7 +65,7 @@ export default function RegisterPage() {
       };
     }
 
-   const onSubmit = async (e: Event)  => {
+    const onSubmit = async (e: Event)  => {
       e.preventDefault();
 
       // 每次提交先清空错误
@@ -135,44 +136,45 @@ export default function RegisterPage() {
 
       if (hasError) return;
 
- // ✅ 真注册：POST /api/auth/register（写入数据库）
-// 注意：你的后端 RegisterSchema 只要 email/password/name，不需要 contact
-try {
-  const res = await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    // 同域其实不必 include，但加了也没坏处
-    credentials: 'include',
-    body: JSON.stringify({
-      email: emailValue.toLowerCase(),
-      password: pwValue,
-      name: nameValue,
-    }),
-  });
+      // ✅ 真注册：POST /api/auth/register（写入数据库）
+      // 注意：你的后端 RegisterSchema 只要 email/password/name，不需要 contact
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          // 同域其实不必 include，但加了也没坏处
+          credentials: 'include',
+          body: JSON.stringify({
+            email: emailValue.toLowerCase(),
+            password: pwValue,
+            name: nameValue,
+          }),
+        });
 
-  const data = await res.json().catch(() => null);
+        const data = await res.json().catch(() => null);
 
-  if (!res.ok) {
-    // 让你看得见具体原因（比如 409 user exists / 400 validation）
-    const msg =
-      (data && (data.message || data.error)) ||
-      `登録に失敗しました（${res.status}）`;
-    contactEl.classList.add('is-invalid');
-    contactErr.textContent = msg;
-    return;
-  }
+        if (!res.ok) {
+          // 让你看得见具体原因（比如 409 user exists / 400 validation）
+          const msg =
+            (data && (data.message || data.error)) ||
+            `登録に失敗しました（${res.status}）`;
+          contactEl.classList.add('is-invalid');
+          contactErr.textContent = msg;
+          return;
+        }
 
-  // ✅ 注册成功 → 跳转 login 并带上 email
-  const params = new URLSearchParams({
-    registered: '1',
-    email: emailValue.toLowerCase(),
-  });
-  window.location.href = `${LOGIN_URL}?${params.toString()}`;
-} catch (err) {
-  contactEl.classList.add('is-invalid');
-  contactErr.textContent = '通信エラーが発生しました。もう一度試してください。';
-  return;
-}
+        // ✅ 注册成功 → 跳转 login 并带上 email
+        const params = new URLSearchParams({
+          registered: '1',
+          email: emailValue.toLowerCase(),
+        });
+        window.location.href = `${LOGIN_URL}?${params.toString()}`;
+      } catch (err) {
+        contactEl.classList.add('is-invalid');
+        contactErr.textContent = '通信エラーが発生しました。もう一度試してください。';
+        return;
+      }
+    };
 
     form.addEventListener('submit', onSubmit);
 
