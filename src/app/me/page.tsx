@@ -1,12 +1,88 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useFavorites } from '@/lib/favorites';
+import { toggleFavorite } from '@/lib/card_actions';
 
 type PanelKey = 'p-profile' | 'p-favs' | 'p-address' | 'p-settings';
+
+type CardLite = {
+  id: string;
+  title?: string;
+  price?: string | number;
+  imageUrl?: string;
+  // 兼容你可能已有的字段名
+  name?: string;
+  img?: string;
+  image?: string;
+};
+
+async function fetchCardById(cardId: string): Promise<CardLite> {
+  // ✅ 你如果有真实的 API 路径，把这里改成你的即可
+  const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store' });
+  if (!res.ok) return { id: cardId };
+
+  const data = await res.json();
+
+  // 尽量把各种可能字段“归一”
+  return {
+    id: cardId,
+    title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
+    price: data.price ?? data.currentPrice ?? data.amount,
+    imageUrl: data.imageUrl ?? data.img ?? data.image ?? data.thumbnailUrl,
+  };
+}
 
 export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
+
+  // ✅ 用你现有的 favorites 系统
+  const { favorites, loading } = useFavorites() as {
+    favorites: Set<string>;
+    loading: Set<string> | boolean; // 你截图里 loading 是 Set<string>
+  };
+
+  const favIds = useMemo(() => Array.from(favorites ?? []), [favorites]);
+
+  // ✅ 缓存卡片详情：避免每次切 tab 都重新请求
+  const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
+  const [favCardsLoading, setFavCardsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!favIds || favIds.length === 0) {
+        setFavCards({});
+        return;
+      }
+
+      // 找出还没拉过详情的 id
+      const missing = favIds.filter((id) => !favCards[id]);
+      if (missing.length === 0) return;
+
+      setFavCardsLoading(true);
+      try {
+        const results = await Promise.all(missing.map((id) => fetchCardById(id)));
+        if (cancelled) return;
+
+        setFavCards((prev) => {
+          const next = { ...prev };
+          for (const card of results) next[card.id] = card;
+          return next;
+        });
+      } finally {
+        if (!cancelled) setFavCardsLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favIds.join('|')]);
 
   return (
     <>
@@ -48,20 +124,12 @@ export default function MePage(): React.ReactElement {
           <div className="section">
             <div>
               <label htmlFor="name">名前</label>
-              <input
-                id="name"
-                className="input"
-                placeholder="ユーザー名を入力してください"
-              />
+              <input id="name" className="input" placeholder="ユーザー名を入力してください" />
             </div>
 
             <div>
               <label htmlFor="email">メールアドレス</label>
-              <input
-                id="email"
-                className="input"
-                placeholder="example@example.com"
-              />
+              <input id="email" className="input" placeholder="example@example.com" />
             </div>
 
             <div className="pw-wrap">
@@ -90,30 +158,68 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* お気に入り */}
+        {/* お気に入り（✅ 動的） */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2>お気に入り</h2>
-          <div className="fav-list">
-            {[1, 2, 3].map((i) => (
-              <article className="card" key={i}>
-                <div className="thumb">
-                  <img src="/pic/card.png" alt="カード画像" />
-                </div>
-                <div className="meta">
-                  <div className="title">
-                    2020 Lamelo Ball Sensational Auto #SS-LMB PSA 10 Rookie RC
-                  </div>
-                  <div className="chip-row">
-                    <span>◎ 1 点</span>
-                    <span className="price">US $34.99</span>
-                    <a className="sub" href="#">
-                      お気に入りから削除
-                    </a>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
+
+          {/* 你截图里 loading 是 Set<string>，这里兼容两种 */}
+          {((loading instanceof Set && loading.size > 0) || loading === true) && (
+            <p>読み込み中…</p>
+          )}
+
+          {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
+            <p>お気に入りはありません。</p>
+          )}
+
+          {favIds.length > 0 && (
+            <>
+              {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
+
+              <div className="fav-list">
+                {favIds.map((id) => {
+                  const card = favCards[id];
+
+                  const title = card?.title ?? `カードID: ${id}`;
+                  const price = card?.price ?? '';
+                  const imgSrc = card?.imageUrl ?? '/pic/card.png';
+
+                  return (
+                    <article className="card" key={id}>
+                      <div className="thumb">
+                        <img src={imgSrc} alt="カード画像" />
+                      </div>
+
+                      <div className="meta">
+                        <div className="title">{title}</div>
+
+                        <div className="chip-row">
+                          <span>◎ 1 点</span>
+
+                          {price !== '' && <span className="price">{price}</span>}
+
+                          <button
+                            className="sub"
+                            type="button"
+                            onClick={() => toggleFavorite(id)}
+                            style={{
+                              background: 'transparent',
+                              border: '0',
+                              padding: 0,
+                              cursor: 'pointer',
+                              color: '#6b7280',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            お気に入りから削除
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </section>
 
         {/* 住所 */}
@@ -305,4 +411,3 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
-
