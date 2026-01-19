@@ -19,7 +19,6 @@ async function fetchCardById(cardId: string): Promise<CardLite> {
 
   const raw = await res.json();
 
-  // 开发时确认返回结构（确认后可删）
   if (process.env.NODE_ENV === 'development') {
     console.log('[api/cards/:id]', raw);
   }
@@ -69,19 +68,13 @@ async function fetchCardById(cardId: string): Promise<CardLite> {
     (Array.isArray(c.images) ? (c.images[0]?.url ?? c.images[0]) : undefined) ??
     (Array.isArray(c.imageUrls) ? c.imageUrls[0] : undefined);
 
-  return {
-    id: cardId,
-    title,
-    price,
-    imageUrl,
-  };
+  return { id: cardId, title, price, imageUrl };
 }
 
 export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // favorites: Set<cardId> / loading: Set<cardId>
   const { favorites, loading } = useFavorites() as {
     favorites: Set<string>;
     loading: Set<string>;
@@ -96,7 +89,6 @@ export default function MePage(): React.ReactElement {
     let cancelled = false;
 
     async function run() {
-      // ✅ 裁剪缓存：只保留当前 favorites，避免越存越大
       setFavCards((prev) => {
         const next: Record<string, CardLite> = {};
         for (const id of favIds) {
@@ -107,13 +99,14 @@ export default function MePage(): React.ReactElement {
 
       if (favIds.length === 0) return;
 
-      // ✅ 找出还没拉过详情的 id
       const missing = favIds.filter((id) => !favCards[id]);
       if (missing.length === 0) return;
 
       setFavCardsLoading(true);
       try {
-        const results = await Promise.all(missing.map((id) => fetchCardById(id)));
+        const results = await Promise.all(
+          missing.map((id) => fetchCardById(id))
+        );
         if (cancelled) return;
 
         setFavCards((prev) => {
@@ -130,8 +123,7 @@ export default function MePage(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [favIds.join('|')]);
+  }, [favIds.join('|')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -171,209 +163,109 @@ export default function MePage(): React.ReactElement {
           </button>
         </nav>
 
-        {/* 個人情報 */}
+        {/* 个⼈信息 */}
         <section className={`panel ${active === 'p-profile' ? 'active' : ''}`}>
           <div className="section">
-            <div>
-              <label htmlFor="name">名前</label>
-              <input
-                id="name"
-                className="input"
-                placeholder="ユーザー名を入力してください"
-              />
-            </div>
+            <label>名前</label>
+            <input className="input" placeholder="ユーザー名" />
 
-            <div>
-              <label htmlFor="email">メールアドレス</label>
-              <input
-                id="email"
-                className="input"
-                placeholder="example@example.com"
-              />
-            </div>
+            <label>メールアドレス</label>
+            <input className="input" placeholder="example@example.com" />
 
             <div className="pw-wrap">
-              <label htmlFor="pw">パスワード</label>
+              <label>パスワード</label>
               <input
-                id="pw"
                 className="input"
                 type={showPw ? 'text' : 'password'}
-                placeholder="パスワードを入力してください"
+                placeholder="********"
               />
               <button
                 className="pw-toggle"
                 type="button"
-                aria-label="パスワード表示切替"
                 onClick={() => setShowPw((v) => !v)}
               >
                 👁
               </button>
             </div>
 
-            <div
-              className="actions"
-              style={{ display: 'flex', justifyContent: 'center' }}
-            >
-              <button className="btn" type="button">
-                保存
-              </button>
-            </div>
+            <button className="btn">保存</button>
           </div>
         </section>
 
-        {/* お気に入り（動的） */}
+        {/* お気に入り */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2>お気に入り</h2>
 
           {loading.size > 0 && <p>読み込み中…</p>}
-
           {loading.size === 0 && favIds.length === 0 && (
             <p>お気に入りはありません。</p>
           )}
 
-          {favIds.length > 0 && (
-            <>
-              {favCardsLoading && (
-                <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>
-              )}
-
-              <div className="fav-list">
-                {favIds.map((id) => {
-                  const card = favCards[id];
-
-                  const title = card?.title ?? `カードID: ${id}`;
-                  const price = card?.price;
-                  const imgSrc = card?.imageUrl ?? '/pic/card.png';
-
-                  return (
-                    <article className="card" key={id}>
-                      <div className="thumb">
-                        <img src={imgSrc} alt="カード画像" />
-                      </div>
-
-                      <div className="meta">
-                        <div className="title">{title}</div>
-
-                        <div className="chip-row">
-                          <span>◎ 1 点</span>
-
-                          {price != null && price !== '' && (
-                            <span className="price">{price}</span>
-                          )}
-
-                          <button
-                            className="sub"
-                            type="button"
-                            onClick={() => toggleFavorite(id)}
-                            style={{
-                              background: 'transparent',
-                              border: 0,
-                              padding: 0,
-                              cursor: 'pointer',
-                              color: '#6b7280',
-                              textDecoration: 'underline',
-                            }}
-                          >
-                            お気に入りから削除
-                          </button>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </section>
-
-        {/* 住所 */}
-        <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
-          <div className="section" style={{ maxWidth: 640 }}>
-            <div>
-              <label htmlFor="country">国家</label>
-              <select id="country" className="select">
-                <option>日本</option>
-                <option>中国</option>
-                <option>United States</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="zip">郵便番号</label>
-              <input id="zip" className="input" placeholder="1660002" />
-            </div>
-
-            <div className="row-2">
-              <div>
-                <label htmlFor="city">都市・区</label>
-                <input id="city" className="input" placeholder="東京・杉並区" />
-              </div>
-              <div>
-                <label htmlFor="block">番地</label>
-                <input id="block" className="input" placeholder="4-32-9" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="addr">住所</label>
-              <input id="addr" className="input" placeholder="ジュネス５ 303室" />
-            </div>
-
-            <div
-              className="actions"
-              style={{ display: 'flex', justifyContent: 'center' }}
-            >
-              <button className="btn" type="button">
-                保存
-              </button>
-            </div>
+          <div className="fav-list">
+            {favIds.map((id) => {
+              const card = favCards[id];
+              return (
+                <article className="card" key={id}>
+                  <div className="thumb">
+                    <img
+                      src={card?.imageUrl ?? '/pic/card.png'}
+                      alt=""
+                    />
+                  </div>
+                  <div>
+                    <div className="title">
+                      {card?.title ?? `カードID: ${id}`}
+                    </div>
+                    {card?.price && (
+                      <div className="price">{card.price}</div>
+                    )}
+                    <button
+                      className="sub"
+                      onClick={() => toggleFavorite(id)}
+                    >
+                      お気に入りから削除
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 
-        {/* 設定 */}
-        <section
-          className={`panel ${active === 'p-settings' ? 'active' : ''}`}
-          id="p-settings"
-        >
-          <div className="section" style={{ maxWidth: 520 }}>
-            <div>
-              <label htmlFor="lang">言語</label>
-              <select id="lang" className="select">
-                <option>日本語</option>
-                <option>English</option>
-                <option>中文</option>
-              </select>
-            </div>
+        {/* 地址 */}
+        <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
+          <div className="section">
+            <label>住所</label>
+            <input className="input" placeholder="東京都…" />
+            <button className="btn">保存</button>
+          </div>
+        </section>
 
-         
+        {/* 设置（只保留按钮，没有标题） */}
+        <section className={`panel ${active === 'p-settings' ? 'active' : ''}`}>
+          <div className="section">
+            <label>言語</label>
+            <select className="select">
+              <option>日本語</option>
+              <option>English</option>
+              <option>中文</option>
+            </select>
+
+            <button className="btn">サインアウト</button>
           </div>
         </section>
       </main>
 
-      {/* 样式 */}
       <style jsx global>{`
-        :root {
-          --bg: #ffffff;
-          --muted: #6b7280;
-          --border: #e5e7eb;
-          --primary: #111111;
-        }
-        * {
-          box-sizing: border-box;
-        }
         body {
-          margin: 0;
-          font-family: 'Noto Sans JP', system-ui, -apple-system, Roboto, Arial;
-          background: var(--bg);
-          color: #111;
+          font-family: 'Noto Sans JP', sans-serif;
         }
         .wrap {
-          max-width: 1100px;
-          margin: 32px auto;
-          padding: 0 16px;
           display: grid;
           grid-template-columns: 220px 1fr;
           gap: 40px;
+          max-width: 1100px;
+          margin: 32px auto;
         }
         .sidenav {
           display: flex;
@@ -381,12 +273,9 @@ export default function MePage(): React.ReactElement {
           gap: 10px;
         }
         .nav-btn {
-          padding: 12px 16px;
           border-radius: 9999px;
-          border: 1px dashed #e6e6e6;
-          background: #fff;
-          font-weight: 600;
-          cursor: pointer;
+          padding: 12px;
+          border: 1px dashed #ddd;
         }
         .nav-btn.active {
           background: #111;
@@ -403,48 +292,19 @@ export default function MePage(): React.ReactElement {
           gap: 14px;
           max-width: 520px;
         }
-        .row-2 {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 14px;
-        }
-        label {
-          font-weight: 700;
-          font-size: 14px;
-        }
         .input,
         .select {
-          width: 100%;
           height: 44px;
-          padding: 10px 12px;
-          background: #ededed;
-          border: 1.5px solid var(--border);
           border-radius: 12px;
+          padding: 0 12px;
+          background: #eee;
         }
         .btn {
           height: 48px;
-          min-width: 200px;
           border-radius: 9999px;
-          background: var(--primary);
+          background: #111;
           color: #fff;
-          font-weight: 700;
-          border: 0;
-          cursor: pointer;
-        }
-        .pw-wrap {
-          position: relative;
-        }
-        .pw-toggle {
-          position: absolute;
-          right: 8px;
-          top: 50%;
-          transform: translateY(-50%);
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          border: 1px solid var(--border);
-          background: #fff;
-          cursor: pointer;
+          font-weight: bold;
         }
         .fav-list {
           display: grid;
@@ -454,10 +314,9 @@ export default function MePage(): React.ReactElement {
           display: grid;
           grid-template-columns: 96px 1fr;
           gap: 16px;
+          border: 1px solid #eee;
           padding: 16px;
-          border: 1px solid var(--border);
           border-radius: 20px;
-          background: #fff;
         }
         .thumb {
           width: 96px;
@@ -474,4 +333,5 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
+
 
