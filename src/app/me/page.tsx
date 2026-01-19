@@ -345,17 +345,7 @@ export default function MePage(): React.ReactElement {
               </select>
             </div>
 
-            <div style={{ marginTop: 24 }}>
-              <h2>サインアウト</h2>
-              <div
-                className="actions"
-                style={{ display: 'flex', justifyContent: 'center' }}
-              >
-                <button className="btn" type="button">
-                  サインアウト
-                </button>
-              </div>
-            </div>
+         
           </div>
         </section>
       </main>
