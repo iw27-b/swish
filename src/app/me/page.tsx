@@ -11,78 +11,41 @@ type CardLite = {
   title?: string;
   price?: string | number;
   imageUrl?: string;
+  // 兼容你可能已有的字段名
+  name?: string;
+  img?: string;
+  image?: string;
 };
 
 async function fetchCardById(cardId: string): Promise<CardLite> {
+  // ✅ 你如果有真实的 API 路径，把这里改成你的即可
   const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store' });
   if (!res.ok) return { id: cardId };
 
-  const raw = await res.json();
+  const data = await res.json();
 
-  // 开发时确认返回结构（确认后可删）
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[api/cards/:id]', raw);
-  }
-
-  const c = raw?.card ?? raw?.data ?? raw?.item ?? raw ?? {};
-
-  const title =
-    c.title ??
-    c.name ??
-    c.cardTitle ??
-    c.itemTitle ??
-    c.card_title ??
-    c.item_title ??
-    c.productTitle ??
-    c.product_title;
-
-  let price: string | number | undefined =
-    c.price ??
-    c.currentPrice ??
-    c.amount ??
-    c.current_price ??
-    c.price_amount ??
-    c.priceAmount;
-
-  const cents =
-    c.priceCents ?? c.price_cents ?? c.amountCents ?? c.amount_cents;
-
-  if (price == null && typeof cents === 'number') {
-    price = cents / 100;
-  }
-
-  const imageUrl =
-    c.imageUrl ??
-    c.image_url ??
-    c.img ??
-    c.image ??
-    c.thumbnailUrl ??
-    c.thumbnail_url ??
-    c.thumb ??
-    c.thumb_url ??
-    c.coverImage ??
-    c.cover_image ??
-    c.imagePath ??
-    c.image_path ??
-    c.imageKey ??
-    c.image_key ??
-    (Array.isArray(c.images) ? (c.images[0]?.url ?? c.images[0]) : undefined) ??
-    (Array.isArray(c.imageUrls) ? c.imageUrls[0] : undefined);
-
-  return { id: cardId, title, price, imageUrl };
+  // 尽量把各种可能字段“归一”
+  return {
+    id: cardId,
+    title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
+    price: data.price ?? data.currentPrice ?? data.amount,
+    imageUrl: data.imageUrl ?? data.img ?? data.image ?? data.thumbnailUrl,
+  };
 }
 
 export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
+  // ✅ 用你现有的 favorites 系统
   const { favorites, loading } = useFavorites() as {
     favorites: Set<string>;
-    loading: Set<string>;
+    loading: Set<string> | boolean; // 你截图里 loading 是 Set<string>
   };
 
   const favIds = useMemo(() => Array.from(favorites ?? []), [favorites]);
 
+  // ✅ 缓存卡片详情：避免每次切 tab 都重新请求
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
@@ -90,17 +53,12 @@ export default function MePage(): React.ReactElement {
     let cancelled = false;
 
     async function run() {
-      // 先裁剪缓存：只保留当前 favorites
-      setFavCards((prev) => {
-        const next: Record<string, CardLite> = {};
-        for (const id of favIds) {
-          if (prev[id]) next[id] = prev[id];
-        }
-        return next;
-      });
+      if (!favIds || favIds.length === 0) {
+        setFavCards({});
+        return;
+      }
 
-      if (favIds.length === 0) return;
-
+      // 找出还没拉过详情的 id
       const missing = favIds.filter((id) => !favCards[id]);
       if (missing.length === 0) return;
 
@@ -138,7 +96,6 @@ export default function MePage(): React.ReactElement {
           >
             個人情報
           </button>
-
           <button
             className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`}
             onClick={() => setActive('p-favs')}
@@ -146,7 +103,6 @@ export default function MePage(): React.ReactElement {
           >
             お気に入り
           </button>
-
           <button
             className={`nav-btn ${active === 'p-address' ? 'active' : ''}`}
             onClick={() => setActive('p-address')}
@@ -154,7 +110,6 @@ export default function MePage(): React.ReactElement {
           >
             住所
           </button>
-
           <button
             className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`}
             onClick={() => setActive('p-settings')}
@@ -169,20 +124,12 @@ export default function MePage(): React.ReactElement {
           <div className="section">
             <div>
               <label htmlFor="name">名前</label>
-              <input
-                id="name"
-                className="input"
-                placeholder="ユーザー名を入力してください"
-              />
+              <input id="name" className="input" placeholder="ユーザー名を入力してください" />
             </div>
 
             <div>
               <label htmlFor="email">メールアドレス</label>
-              <input
-                id="email"
-                className="input"
-                placeholder="example@example.com"
-              />
+              <input id="email" className="input" placeholder="example@example.com" />
             </div>
 
             <div className="pw-wrap">
@@ -203,10 +150,7 @@ export default function MePage(): React.ReactElement {
               </button>
             </div>
 
-            <div
-              className="actions"
-              style={{ display: 'flex', justifyContent: 'center' }}
-            >
+            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn" type="button">
                 保存
               </button>
@@ -214,27 +158,29 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* お気に入り（動的） */}
+        {/* お気に入り（✅ 動的） */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2>お気に入り</h2>
 
-          {loading.size > 0 && <p>読み込み中…</p>}
+          {/* 你截图里 loading 是 Set<string>，这里兼容两种 */}
+          {((loading instanceof Set && loading.size > 0) || loading === true) && (
+            <p>読み込み中…</p>
+          )}
 
-          {loading.size === 0 && favIds.length === 0 && (
+          {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
             <p>お気に入りはありません。</p>
           )}
 
           {favIds.length > 0 && (
             <>
-              {favCardsLoading && (
-                <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>
-              )}
+              {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
 
               <div className="fav-list">
                 {favIds.map((id) => {
                   const card = favCards[id];
+
                   const title = card?.title ?? `カードID: ${id}`;
-                  const price = card?.price;
+                  const price = card?.price ?? '';
                   const imgSrc = card?.imageUrl ?? '/pic/card.png';
 
                   return (
@@ -249,9 +195,7 @@ export default function MePage(): React.ReactElement {
                         <div className="chip-row">
                           <span>◎ 1 点</span>
 
-                          {price != null && price !== '' && (
-                            <span className="price">{price}</span>
-                          )}
+                          {price !== '' && <span className="price">{price}</span>}
 
                           <button
                             className="sub"
@@ -259,7 +203,7 @@ export default function MePage(): React.ReactElement {
                             onClick={() => toggleFavorite(id)}
                             style={{
                               background: 'transparent',
-                              border: 0,
+                              border: '0',
                               padding: 0,
                               cursor: 'pointer',
                               color: '#6b7280',
@@ -311,10 +255,7 @@ export default function MePage(): React.ReactElement {
               <input id="addr" className="input" placeholder="ジュネス５ 303室" />
             </div>
 
-            <div
-              className="actions"
-              style={{ display: 'flex', justifyContent: 'center' }}
-            >
+            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn" type="button">
                 保存
               </button>
@@ -323,7 +264,7 @@ export default function MePage(): React.ReactElement {
         </section>
 
         {/* 設定 */}
-        <section className={`panel ${active === 'p-settings' ? 'active' : ''}`}>
+        <section className={`panel ${active === 'p-settings' ? 'active' : ''}`} id="p-settings">
           <div className="section" style={{ maxWidth: 520 }}>
             <div>
               <label htmlFor="lang">言語</label>
@@ -334,11 +275,13 @@ export default function MePage(): React.ReactElement {
               </select>
             </div>
 
-            {/* ✅ 这里删掉了 <h2>サインアウト</h2>，只保留按钮 */}
-            <div className="actions" style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
-              <button className="btn" type="button">
-                サインアウト
-              </button>
+            <div style={{ marginTop: 24 }}>
+              <h2>サインアウト</h2>
+              <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+                <button className="btn" type="button">
+                  サインアウト
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -468,8 +411,4 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
-
-  );
-}
-
 
