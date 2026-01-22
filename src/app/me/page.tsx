@@ -49,17 +49,53 @@ export default function MePage(): React.ReactElement {
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
+  // ✅ 关键修复：点击“削除”先让 UI 立刻生效（避免“点了没反应”）
+  const [hiddenFavs, setHiddenFavs] = useState<Set<string>>(new Set());
+
+  // ✅ 用于渲染的收藏列表（把刚删掉的先隐藏）
+  const viewFavIds = useMemo(
+    () => favIds.filter((id) => !hiddenFavs.has(id)),
+    [favIds, hiddenFavs]
+  );
+
+  async function removeFav(id: string) {
+    // 先让 UI 立刻有反应
+    setHiddenFavs((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
+    // 清掉这张卡的缓存（避免残影/重复感）
+    setFavCards((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    try {
+      await toggleFavorite(id);
+    } catch (e) {
+      // 失败就回滚 UI
+      setHiddenFavs((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!favIds || favIds.length === 0) {
+      if (!viewFavIds || viewFavIds.length === 0) {
         setFavCards({});
         return;
       }
 
       // 找出还没拉过详情的 id
-      const missing = favIds.filter((id) => !favCards[id]);
+      const missing = viewFavIds.filter((id) => !favCards[id]);
       if (missing.length === 0) return;
 
       setFavCardsLoading(true);
@@ -82,7 +118,7 @@ export default function MePage(): React.ReactElement {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [favIds.join('|')]);
+  }, [viewFavIds.join('|'), favCards]);
 
   return (
     <>
@@ -167,16 +203,16 @@ export default function MePage(): React.ReactElement {
             <p>読み込み中…</p>
           )}
 
-          {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
+          {!((loading instanceof Set && loading.size > 0) || loading === true) && viewFavIds.length === 0 && (
             <p>お気に入りはありません。</p>
           )}
 
-          {favIds.length > 0 && (
+          {viewFavIds.length > 0 && (
             <>
               {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
 
               <div className="fav-list">
-                {favIds.map((id) => {
+                {viewFavIds.map((id) => {
                   const card = favCards[id];
 
                   const title = card?.title ?? `カードID: ${id}`;
@@ -200,7 +236,7 @@ export default function MePage(): React.ReactElement {
                           <button
                             className="sub"
                             type="button"
-                            onClick={() => toggleFavorite(id)}
+                            onClick={() => removeFav(id)}
                             style={{
                               background: 'transparent',
                               border: '0',
@@ -236,23 +272,23 @@ export default function MePage(): React.ReactElement {
 
             <div>
               <label htmlFor="zip">郵便番号</label>
-              <input id="zip" className="input" placeholder="1660002" />
+              <input id="zip" className="input" placeholder="例：166-0002" />
             </div>
 
             <div className="row-2">
               <div>
                 <label htmlFor="city">都市・区</label>
-                <input id="city" className="input" placeholder="東京・杉並区" />
+                <input id="city" className="input" placeholder="例：東京都杉並区" />
               </div>
               <div>
                 <label htmlFor="block">番地</label>
-                <input id="block" className="input" placeholder="4-32-9" />
+                <input id="block" className="input" placeholder="例：4-32-9" />
               </div>
             </div>
 
             <div>
               <label htmlFor="addr">住所</label>
-              <input id="addr" className="input" placeholder="ジュネス５ 303室" />
+              <input id="addr" className="input" placeholder="例：ジュネス5 303号室" />
             </div>
 
             <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
@@ -276,7 +312,6 @@ export default function MePage(): React.ReactElement {
             </div>
 
             <div style={{ marginTop: 24 }}>
-          
               <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
                 <button className="btn" type="button">
                   サインアウト
