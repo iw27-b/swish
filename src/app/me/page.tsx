@@ -11,17 +11,20 @@ type CardLite = {
   title?: string;
   price?: string | number;
   imageUrl?: string;
+  // 兼容你可能已有的字段名
   name?: string;
   img?: string;
   image?: string;
 };
 
 async function fetchCardById(cardId: string): Promise<CardLite> {
+  // ✅ 你如果有真实的 API 路径，把这里改成你的即可
   const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store' });
   if (!res.ok) return { id: cardId };
 
   const data = await res.json();
 
+  // 尽量把各种可能字段“归一”
   return {
     id: cardId,
     title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
@@ -34,58 +37,29 @@ export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
+  // ✅ 用你现有的 favorites 系统
   const { favorites, loading } = useFavorites() as {
     favorites: Set<string>;
-    loading: Set<string> | boolean;
+    loading: Set<string> | boolean; // 你截图里 loading 是 Set<string>
   };
 
   const favIds = useMemo(() => Array.from(favorites ?? []), [favorites]);
 
+  // ✅ 缓存卡片详情：避免每次切 tab 都重新请求
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
-
-  const [hiddenFavs, setHiddenFavs] = useState<Set<string>>(new Set());
-
-  const viewFavIds = useMemo(
-    () => favIds.filter((id) => !hiddenFavs.has(id)),
-    [favIds, hiddenFavs]
-  );
-
-  async function removeFav(id: string) {
-    setHiddenFavs((prev) => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-
-    setFavCards((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-
-    try {
-      await toggleFavorite(id);
-    } catch {
-      setHiddenFavs((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      if (!viewFavIds || viewFavIds.length === 0) {
+      if (!favIds || favIds.length === 0) {
         setFavCards({});
-        setHiddenFavs(new Set());
         return;
       }
 
-      const missing = viewFavIds.filter((id) => !favCards[id]);
+      // 找出还没拉过详情的 id
+      const missing = favIds.filter((id) => !favCards[id]);
       if (missing.length === 0) return;
 
       setFavCardsLoading(true);
@@ -107,59 +81,137 @@ export default function MePage(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-    // 🔴 关键修复：绝对不要把 favCards 放进依赖
-  }, [viewFavIds.join('|')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [favIds.join('|')]);
 
   return (
     <>
       <main className="wrap">
+        {/* 左侧导航 */}
         <nav className="sidenav" aria-label="アカウントメニュー">
-          <button className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`} onClick={() => setActive('p-profile')} type="button">個人情報</button>
-          <button className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`} onClick={() => setActive('p-favs')} type="button">お気に入り</button>
-          <button className={`nav-btn ${active === 'p-address' ? 'active' : ''}`} onClick={() => setActive('p-address')} type="button">住所</button>
-          <button className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`} onClick={() => setActive('p-settings')} type="button">設定</button>
+          <button
+            className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`}
+            onClick={() => setActive('p-profile')}
+            type="button"
+          >
+            個人情報
+          </button>
+          <button
+            className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`}
+            onClick={() => setActive('p-favs')}
+            type="button"
+          >
+            お気に入り
+          </button>
+          <button
+            className={`nav-btn ${active === 'p-address' ? 'active' : ''}`}
+            onClick={() => setActive('p-address')}
+            type="button"
+          >
+            住所
+          </button>
+          <button
+            className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`}
+            onClick={() => setActive('p-settings')}
+            type="button"
+          >
+            設定
+          </button>
         </nav>
 
+        {/* 個人情報 */}
         <section className={`panel ${active === 'p-profile' ? 'active' : ''}`}>
           <div className="section">
             <div>
-              <label>名前</label>
-              <input className="input" placeholder="ユーザー名を入力してください" />
+              <label htmlFor="name">名前</label>
+              <input id="name" className="input" placeholder="ユーザー名を入力してください" />
             </div>
+
             <div>
-              <label>メールアドレス</label>
-              <input className="input" placeholder="example@example.com" />
+              <label htmlFor="email">メールアドレス</label>
+              <input id="email" className="input" placeholder="example@example.com" />
             </div>
+
             <div className="pw-wrap">
-              <label>パスワード</label>
-              <input className="input" type={showPw ? 'text' : 'password'} placeholder="パスワードを入力してください" />
-              <button className="pw-toggle" type="button" onClick={() => setShowPw(v => !v)}>👁</button>
+              <label htmlFor="pw">パスワード</label>
+              <input
+                id="pw"
+                className="input"
+                type={showPw ? 'text' : 'password'}
+                placeholder="パスワードを入力してください"
+              />
+              <button
+                className="pw-toggle"
+                type="button"
+                aria-label="パスワード表示切替"
+                onClick={() => setShowPw((v) => !v)}
+              >
+                👁
+              </button>
             </div>
-            <div className="actions"><button className="btn">保存</button></div>
+
+            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn" type="button">
+                保存
+              </button>
+            </div>
           </div>
         </section>
 
+        {/* お気に入り（✅ 動的） */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
-          <h2>お気に入り</h2>
+          <h2></h2>
 
-          {((loading instanceof Set && loading.size > 0) || loading === true) && <p>読み込み中…</p>}
-          {!((loading instanceof Set && loading.size > 0) || loading === true) && viewFavIds.length === 0 && <p>お気に入りはありません。</p>}
+          {/* 你截图里 loading 是 Set<string>，这里兼容两种 */}
+          {((loading instanceof Set && loading.size > 0) || loading === true) && (
+            <p>読み込み中…</p>
+          )}
 
-          {viewFavIds.length > 0 && (
+          {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
+            <p></p>
+          )}
+
+          {favIds.length > 0 && (
             <>
               {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
+
               <div className="fav-list">
-                {viewFavIds.map((id) => {
+                {favIds.map((id) => {
                   const card = favCards[id];
+
+                  const title = card?.title ?? `カードID: ${id}`;
+                  const price = card?.price ?? '';
+                  const imgSrc = card?.imageUrl ?? '/pic/card.png';
+
                   return (
                     <article className="card" key={id}>
-                      <div className="thumb"><img src={card?.imageUrl ?? '/pic/card.png'} /></div>
+                      <div className="thumb">
+                        <img src={imgSrc} alt="カード画像" />
+                      </div>
+
                       <div className="meta">
-                        <div className="title">{card?.title ?? `カードID: ${id}`}</div>
+                        <div className="title">{title}</div>
+
                         <div className="chip-row">
                           <span>◎ 1 点</span>
-                          {card?.price && <span className="price">{card.price}</span>}
-                          <button className="sub" type="button" onClick={() => removeFav(id)}>お気に入りから削除</button>
+
+                          {price !== '' && <span className="price">{price}</span>}
+
+                          <button
+                            className="sub"
+                            type="button"
+                            onClick={() => toggleFavorite(id)}
+                            style={{
+                              background: 'transparent',
+                              border: '0',
+                              padding: 0,
+                              cursor: 'pointer',
+                              color: '#6b7280',
+                              textDecoration: 'underline',
+                            }}
+                          >
+                            お気に入りから削除
+                          </button>
                         </div>
                       </div>
                     </article>
@@ -170,31 +222,70 @@ export default function MePage(): React.ReactElement {
           )}
         </section>
 
+        {/* 住所 */}
         <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
           <div className="section" style={{ maxWidth: 640 }}>
-            <label>国家</label>
-            <select className="select"><option>日本</option><option>中国</option><option>United States</option></select>
-            <label>郵便番号</label>
-            <input className="input" placeholder="例：166-0002" />
-            <div className="row-2">
-              <input className="input" placeholder="例：東京都杉並区" />
-              <input className="input" placeholder="例：4-32-9" />
+            <div>
+              <label htmlFor="country">国家</label>
+              <select id="country" className="select">
+                <option>日本</option>
+                <option>中国</option>
+                <option>United States</option>
+              </select>
             </div>
-            <label>住所</label>
-            <input className="input" placeholder="例：ジュネス5 303号室" />
-            <div className="actions"><button className="btn">保存</button></div>
+
+            <div>
+              <label htmlFor="zip">郵便番号</label>
+              <input id="zip" className="input" placeholder="1660002" />
+            </div>
+
+            <div className="row-2">
+              <div>
+                <label htmlFor="city">都市・区</label>
+                <input id="city" className="input" placeholder="例：東京・杉並区" />
+              </div>
+              <div>
+                <label htmlFor="block">番地</label>
+                <input id="block" className="input" placeholder="例：4-32-9" />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="addr">住所</label>
+              <input id="addr" className="input" placeholder="例：ジュネス５ 303室" />
+            </div>
+
+            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn" type="button">
+                保存
+              </button>
+            </div>
           </div>
         </section>
 
-        <section className={`panel ${active === 'p-settings' ? 'active' : ''}`}>
-          <div className="section">
-            <label>言語</label>
-            <select className="select"><option>日本語</option><option>English</option><option>中文</option></select>
-            <div className="actions"><button className="btn">サインアウト</button></div>
+        {/* 設定 */}
+        <section className={`panel ${active === 'p-settings' ? 'active' : ''}`} id="p-settings">
+          <div className="section" style={{ maxWidth: 520 }}>
+            <div>
+              <label htmlFor="lang">言語</label>
+              <select id="lang" className="select">
+                <option>日本語</option>
+                <option>English</option>
+                <option>中文</option>
+              </select>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+          
+              <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+                <button className="btn" type="button">
+                  サインアウト
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       </main>
-    </>
 
       {/* 样式 */}
       <style jsx global>{`
@@ -320,4 +411,3 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
-
