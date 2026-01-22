@@ -26,7 +26,8 @@ export default function News() {
                 key={index}
                 className="py-6 border-b border-gray-200 last:border-b-0"
               >
-                <p className="text-base sm:text-lg">{item}</p>
+                {/* <p className="text-base sm:text-lg">{item}</p> */}
+                <p className="text-base">{item}</p>
               </div>
             ))}
           </div>
