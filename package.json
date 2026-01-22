@@ -15,7 +15,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && pnpm db:seed"
   },
-  
+
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -64,5 +64,14 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "vitest-mock-extended": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "argon2",
+      "prisma",
+      "sharp",
+      "esbuild"
+    ]
   }
 }
