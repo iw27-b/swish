@@ -236,7 +236,7 @@ export default function MePage(): React.ReactElement {
 
             <div>
               <label htmlFor="zip">郵便番号</label>
-              <input id="zip" className="input" placeholder="1660002" />
+              <input id="zip" className="input" placeholder="例：1660002" />
             </div>
 
             <div className="row-2">
