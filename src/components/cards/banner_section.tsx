@@ -9,7 +9,7 @@ const BannerSection: React.FC = () => {
     return (
         <ErrorBoundary
             fallback={
-                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-14 bt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="bg-gray-100 rounded-lg p-8 text-center">
                         <p className="text-gray-600">バナーカルーセルが利用できません。</p>
                     </div>
