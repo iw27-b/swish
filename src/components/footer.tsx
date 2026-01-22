@@ -9,7 +9,7 @@ const Footer: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-8">
           
           <div className="flex flex-row items-center">
-            <div className="text-gray-400 text-[24px] sm:text-4xl font-bold uppercase opacity-20 mr-10">
+            <div className="text-gray-400 text-[40px] sm:text-8xl font-bold uppercase opacity-20 mr-10">
               SWISH
             </div>
 
