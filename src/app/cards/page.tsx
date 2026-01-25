@@ -412,7 +412,7 @@ const CardsPage: React.FC = () => {
       <div className="min-h-screen">
         {/* Search Section */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-          <form onSubmit={handleSearchSubmit} className="mb-8 w-full">
+          <form onSubmit={handleSearchSubmit} className="mb-16 w-full">
             <div className="flex w-full">
               <div className="relative flex-1" ref={searchContainerRef}>
                 <span className="absolute left-4 top-1/2 -translate-y-1/2">
