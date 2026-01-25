@@ -255,7 +255,7 @@ export default function CardPage({ params }: CardPageProps) {
       )}
 
       {/* 🔍 搜索框 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <div className="mb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
         <form onSubmit={handleSearchSubmit} className="mb-16 w-full">
           <div className="flex w-full">
             <div className="relative flex-1">
