@@ -1,0 +1,29 @@
+# Database
+DATABASE_URL=postgres://fab2c29da0c5f84864c906e80299069e04d6a8b799cd07dd35fe83c06f3a8657:sk_e6OzPJnoHOzyku6nEDDzG@db.prisma.io:5432/postgres?sslmode=require
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+# JWT
+# 256-bit (32-byte) key – e.g. `openssl rand -base64 32`
+NEXTAUTH_SECRET=245cce3e2aad7e1eaff13f2f95316da05b1652125bd21d
+JWT_SECRET=245cce3e2aad7e1eaff13f2f95316da05b1652125bd21d
+JWT_EXPIRES_IN="30d"
+JWT_REFRESH_SECRET=axeeIlumRQsuAK3nhX2C4icwkH2S91k0+vW2kyP/fm4=
+
+# Encryption
+AES_ENC_SECRET=32-byte-key-goes-here
+
+# Caching
+REDIS_URI=
+
+# Files
+MAX_FILE_UPLOAD_SIZE=10485760
+
+# Email
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=example_user
+SMTP_PASS=example_user_pass # if using Gmail, generate App Password and put it here.
+SMTP_SECURE=false # false if using port 587
+SMTP_FROM=
+
+# Payments
+ENABLE_RANDOM_PAYMENT_FAILURES=true

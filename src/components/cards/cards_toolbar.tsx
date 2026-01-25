@@ -142,8 +142,8 @@ const CardsToolbar: React.FC<CardsToolbarProps> = ({
     };
 
     return (
-        <div className="bg-white  p-4 mb-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="bg-white  p-4">
+            <div className="flex items-center justify-between mb-2">
                 <div className="flex bg-gray-100 rounded-full p-1">
                     <button
                         onClick={() => handleViewModeChange('all')}
@@ -197,7 +197,7 @@ const CardsToolbar: React.FC<CardsToolbarProps> = ({
             </div>
 
             <div className="pt-4">
-                <div className="flex items-start gap-6 mb-4">
+                <div className="flex items-start gap-6">
                     <div className="relative" ref={priceDropdownRef}>
                         <span className="text-sm font-bold text-black">金額</span>
                         <button
