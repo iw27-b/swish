@@ -13,16 +13,43 @@ type CardLite = {
   imageUrl?: string;
 };
 
+// ✅ 改：用 authFetch + 兼容 data 包裹 + 更稳的 imageUrl 提取
 async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<CardLite> {
-  const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store', signal });
+  const res = await authFetch(`/api/cards/${encodeURIComponent(cardId)}`, {
+    cache: 'no-store',
+    signal,
+    headers: {
+      'Cache-Control': 'no-cache',
+      Pragma: 'no-cache',
+    },
+  });
+
   if (!res.ok) return { id: String(cardId) };
 
-  const data = await res.json();
+  const json = await res.json();
+
+  // ✅ 兼容常见结构：{data:{...}} / {data:{card:{...}}} / 直接 {...}
+  const data = json?.data?.card ?? json?.data ?? json?.card ?? json;
+
+  // ✅ 兼容各种图片字段（你后端到底叫什么，这里尽量都吃）
+  const imageUrl =
+    data?.imageUrl ??
+    data?.img ??
+    data?.image ??
+    data?.thumbnailUrl ??
+    data?.frontImageUrl ??
+    data?.images?.[0]?.url ??
+    data?.card?.imageUrl ??
+    data?.card?.img ??
+    data?.card?.image ??
+    undefined;
+
   return {
+    // ✅ 永远用请求的 cardId 做 key，避免后端返回结构导致覆盖
     id: String(cardId),
-    title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
-    price: data.price ?? data.currentPrice ?? data.amount,
-    imageUrl: data.imageUrl ?? data.img ?? data.image ?? data.thumbnailUrl,
+    title: data?.title ?? data?.name ?? data?.cardTitle ?? data?.itemTitle,
+    price: data?.price ?? data?.currentPrice ?? data?.amount,
+    imageUrl,
   };
 }
 
@@ -48,7 +75,6 @@ export default function MePage(): React.ReactElement {
 
   // ✅ 强制刷新收藏 id：进入 fav 面板就拉一次
   const refreshFavIds = async () => {
-    // 每次刷新前先清掉错误
     setFavIdsError(null);
 
     if (!isAuthenticated || !user) {
@@ -59,7 +85,13 @@ export default function MePage(): React.ReactElement {
 
     setFavIdsLoading(true);
     try {
-      const res = await authFetch(`/api/users/${user.id}/favorites?pageSize=50`);
+      const res = await authFetch(`/api/users/${user.id}/favorites?pageSize=50`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
@@ -74,12 +106,7 @@ export default function MePage(): React.ReactElement {
       const raw = data?.data?.favorites ?? data?.favorites ?? [];
       const ids = (raw as any[])
         .map((f) => {
-          const id =
-            f?.card?.id ??
-            f?.cardId ??
-            f?.card_id ??
-            f?.cardID ??
-            f?.id; // 兜底
+          const id = f?.card?.id ?? f?.cardId ?? f?.card_id ?? f?.cardID ?? f?.id;
           return id == null ? null : String(id);
         })
         .filter(Boolean) as string[];
@@ -93,7 +120,7 @@ export default function MePage(): React.ReactElement {
     }
   };
 
-  // ✅ 切到 “お気に入り” 时刷新：同时清缓存，避免旧缓存挡住新数据
+  // ✅ 切到 “お気に入り” 时刷新：清缓存，避免旧缓存挡住新数据
   useEffect(() => {
     if (active === 'p-favs') {
       cacheRef.current = {};
@@ -103,7 +130,7 @@ export default function MePage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, isAuthenticated, user?.id]);
 
-  // ✅ 拉卡片详情（只拉缺失的）
+  // ✅ 拉卡片详情（更稳：永远用 missing[i] 当 key，避免覆盖成同一张图）
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
@@ -116,6 +143,7 @@ export default function MePage(): React.ReactElement {
       }
 
       const missing = favIds.filter((id) => !cacheRef.current[id]);
+
       if (missing.length === 0) {
         setFavCards({ ...cacheRef.current });
         return;
@@ -123,15 +151,17 @@ export default function MePage(): React.ReactElement {
 
       setFavCardsLoading(true);
       try {
-        const results = await Promise.all(
-          missing.map((id) => fetchCardById(id, controller.signal))
-        );
+        const results = await Promise.all(missing.map((id) => fetchCardById(id, controller.signal)));
         if (cancelled) return;
 
-        for (const card of results) {
-          cacheRef.current[String(card.id)] = card;
+        const nextCache: Record<string, CardLite> = { ...cacheRef.current };
+        for (let i = 0; i < missing.length; i++) {
+          const key = String(missing[i]);
+          nextCache[key] = results[i] ?? { id: key };
         }
-        setFavCards({ ...cacheRef.current });
+
+        cacheRef.current = nextCache;
+        setFavCards(nextCache);
       } finally {
         if (!cancelled) setFavCardsLoading(false);
       }
@@ -181,7 +211,7 @@ export default function MePage(): React.ReactElement {
           </button>
         </nav>
 
-        {/* 個人情報（原样保留） */}
+        {/* 個人情報 */}
         <section className={`panel ${active === 'p-profile' ? 'active' : ''}`}>
           <div className="section">
             <div>
@@ -213,7 +243,9 @@ export default function MePage(): React.ReactElement {
             </div>
 
             <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
-              <button className="btn" type="button">保存</button>
+              <button className="btn" type="button">
+                保存
+              </button>
             </div>
           </div>
         </section>
@@ -222,10 +254,7 @@ export default function MePage(): React.ReactElement {
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           {isBusy && <p>読み込み中…</p>}
 
-          {/* ✅ 失败原因显示出来（这会直接告诉你为什么“读了但没显示”） */}
-          {!isBusy && favIdsError && (
-            <p style={{ color: '#ef4444' }}>{favIdsError}</p>
-          )}
+          {!isBusy && favIdsError && <p style={{ color: '#ef4444' }}>{favIdsError}</p>}
 
           {!isBusy && !favIdsError && favIds.length === 0 && (
             <p style={{ color: '#6b7280' }}>お気に入りはまだありません。</p>
@@ -245,6 +274,7 @@ export default function MePage(): React.ReactElement {
                   return (
                     <article className="card" key={id}>
                       <div className="thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
                       </div>
 
@@ -259,8 +289,8 @@ export default function MePage(): React.ReactElement {
                             className="sub"
                             type="button"
                             onClick={async () => {
-                              await toggleFavorite(id);   // 删除（如果后端失败，这里也不会真的删）
-                              await refreshFavIds();      // ✅ 无论如何再拉一次，显示数据库真实结果
+                              await toggleFavorite(id);
+                              await refreshFavIds(); // ✅ 强制刷新列表
                             }}
                             style={{
                               background: 'transparent',
@@ -283,7 +313,7 @@ export default function MePage(): React.ReactElement {
           )}
         </section>
 
-        {/* 住所 / 設定：你原样保留即可 */}
+        {/* 住所 */}
         <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
           <div className="section" style={{ maxWidth: 640 }}>
             <div>
