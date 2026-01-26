@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFavorites } from '@/lib/favorites';
 
 type PanelKey = 'p-profile' | 'p-favs' | 'p-address' | 'p-settings';
@@ -10,18 +10,16 @@ type CardLite = {
   title?: string;
   price?: string | number;
   imageUrl?: string;
-  // 兼容你可能已有的字段名
   name?: string;
   img?: string;
   image?: string;
 };
 
-async function fetchCardById(cardId: string): Promise<CardLite> {
-  const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store' });
-  if (!res.ok) return { id: cardId };
+async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<CardLite> {
+  const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store', signal });
+  if (!res.ok) return { id: String(cardId) };
 
   const data = await res.json();
-
   return {
     id: String(cardId),
     title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
@@ -34,54 +32,58 @@ export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // ✅ 统一：Me 页也只用 useFavorites 里的逻辑（和 Card 页同源）
+  // ✅ 关键：只用 useFavorites（不要从 card_actions import）
   const fav = useFavorites() as unknown as {
     favorites: Set<string>;
     loading: Set<string> | boolean;
     toggleFavorite: (cardId: string) => Promise<void> | void;
-    isFavorited: (cardId: string) => boolean;
   };
 
-  const { favorites, loading, toggleFavorite } = fav;
+  const favorites = fav.favorites ?? new Set<string>();
+  const loading = fav.loading;
+  const toggleFavorite = fav.toggleFavorite;
 
-  const favIds = useMemo(() => Array.from(favorites ?? []).map(String), [favorites]);
+  // ✅ 统一成 string，防止 number/string 对不上
+  const favIds = useMemo(() => Array.from(favorites).map(String), [favorites]);
 
-  // ✅ 缓存卡片详情：避免反复请求
+  // ✅ 用 ref 当缓存，避免 useEffect 因为 favCards state 改变而重复触发
+  const cacheRef = useRef<Record<string, CardLite>>({});
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
+
+  // 用一个稳定 key 作为依赖
+  const favKey = useMemo(() => favIds.slice().sort().join('|'), [favIds]);
 
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
 
     async function run() {
-      if (!favIds.length) {
-        // favCards 可以保留缓存也可以清空，这里按你原逻辑清空
+      if (favIds.length === 0) {
+        cacheRef.current = {};
         setFavCards({});
         return;
       }
 
-      // 找出还没拉过详情的 id
-      const missing = favIds.filter((id) => !favCards[id]);
-      if (missing.length === 0) return;
+      // 只拉取缺失的
+      const missing = favIds.filter((id) => !cacheRef.current[id]);
+      if (missing.length === 0) {
+        // 仍然同步一次 state（防止从别处更新过 cache）
+        setFavCards({ ...cacheRef.current });
+        return;
+      }
 
       setFavCardsLoading(true);
       try {
         const results = await Promise.all(
-          missing.map(async (id) => {
-            // 让 abort 生效（fetchCardById 内部没接 signal，这里简单处理：不传也行）
-            if (controller.signal.aborted) return { id };
-            return fetchCardById(id);
-          })
+          missing.map((id) => fetchCardById(String(id), controller.signal))
         );
+        if (cancelled) return;
 
-        if (cancelled || controller.signal.aborted) return;
-
-        setFavCards((prev) => {
-          const next = { ...prev };
-          for (const card of results) next[String(card.id)] = card;
-          return next;
-        });
+        for (const card of results) {
+          cacheRef.current[String(card.id)] = card;
+        }
+        setFavCards({ ...cacheRef.current });
       } finally {
         if (!cancelled) setFavCardsLoading(false);
       }
@@ -93,7 +95,7 @@ export default function MePage(): React.ReactElement {
       cancelled = true;
       controller.abort();
     };
-  }, [favIds, favCards]);
+  }, [favKey]); // ✅ 只跟收藏列表变化绑定
 
   const isBusy = (loading instanceof Set && loading.size > 0) || loading === true;
 
@@ -171,7 +173,7 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* お気に入り（✅ 動的） */}
+        {/* お気に入り */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2></h2>
 
@@ -185,14 +187,14 @@ export default function MePage(): React.ReactElement {
 
               <div className="fav-list">
                 {favIds.map((id) => {
-                  const card = favCards[id];
+                  const card = favCards[String(id)];
 
                   const title = card?.title ?? `カードID: ${id}`;
                   const price = card?.price ?? '';
                   const imgSrc = card?.imageUrl ?? '/pic/card.png';
 
                   return (
-                    <article className="card" key={id}>
+                    <article className="card" key={String(id)}>
                       <div className="thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
@@ -209,7 +211,8 @@ export default function MePage(): React.ReactElement {
                           <button
                             className="sub"
                             type="button"
-                            onClick={() => toggleFavorite(String(id))} // ✅ hook 内の toggleFavorite を使う
+                            // ✅ 这里是关键：用 hook 的 toggleFavorite
+                            onClick={() => toggleFavorite(String(id))}
                             style={{
                               background: 'transparent',
                               border: '0',
@@ -295,7 +298,6 @@ export default function MePage(): React.ReactElement {
         </section>
       </main>
 
-      {/* 样式 */}
       <style jsx global>{`
         :root {
           --bg: #ffffff;
@@ -419,3 +421,4 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
+
