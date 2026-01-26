@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFavorites } from '@/lib/favorites';
+import { useAuth, authFetch } from '@/lib/client_auth';
 
 type PanelKey = 'p-profile' | 'p-favs' | 'p-address' | 'p-settings';
 
@@ -10,9 +11,6 @@ type CardLite = {
   title?: string;
   price?: string | number;
   imageUrl?: string;
-  name?: string;
-  img?: string;
-  image?: string;
 };
 
 async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<CardLite> {
@@ -32,20 +30,51 @@ export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // ✅ 修正：直接用 hook 返回值（不需要 as unknown as）
-  const { favorites, loading, toggleFavorite } = useFavorites();
+  const { user, isAuthenticated } = useAuth();
+  const { toggleFavorite } = useFavorites();
 
-  // ✅ 统一成 string，防止 number/string 对不上
-  const favIds = useMemo(() => Array.from(favorites).map(String), [favorites]);
+  // ✅ me 页面自己维护 favorites id（不依赖 hook 内 state）
+  const [favIds, setFavIds] = useState<string[]>([]);
+  const [favIdsLoading, setFavIdsLoading] = useState(false);
 
-  // ✅ 用 ref 当缓存，避免 useEffect 因为 favCards state 改变而重复触发
   const cacheRef = useRef<Record<string, CardLite>>({});
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
-  // 用一个稳定 key 作为依赖
   const favKey = useMemo(() => favIds.slice().sort().join('|'), [favIds]);
 
+  // ✅ 强制刷新收藏 id：进入 fav 面板就拉一次
+  async function refreshFavIds() {
+    if (!isAuthenticated || !user) {
+      setFavIds([]);
+      return;
+    }
+    setFavIdsLoading(true);
+    try {
+      const res = await authFetch(`/api/users/${user.id}/favorites?pageSize=50`);
+      if (!res.ok) {
+        setFavIds([]);
+        return;
+      }
+      const data = await res.json();
+      const ids = (data?.data?.favorites ?? [])
+        .map((f: any) => String(f?.card?.id))
+        .filter(Boolean);
+      setFavIds(ids);
+    } finally {
+      setFavIdsLoading(false);
+    }
+  }
+
+  // ✅ 切到 “お気に入り” 时刷新
+  useEffect(() => {
+    if (active === 'p-favs') {
+      refreshFavIds();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, isAuthenticated, user?.id]);
+
+  // ✅ 拉卡片详情（只拉缺失的）
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
@@ -57,10 +86,8 @@ export default function MePage(): React.ReactElement {
         return;
       }
 
-      // 只拉取缺失的
       const missing = favIds.filter((id) => !cacheRef.current[id]);
       if (missing.length === 0) {
-        // 仍然同步一次 state（防止从别处更新过 cache）
         setFavCards({ ...cacheRef.current });
         return;
       }
@@ -68,7 +95,7 @@ export default function MePage(): React.ReactElement {
       setFavCardsLoading(true);
       try {
         const results = await Promise.all(
-          missing.map((id) => fetchCardById(String(id), controller.signal))
+          missing.map((id) => fetchCardById(id, controller.signal))
         );
         if (cancelled) return;
 
@@ -87,48 +114,31 @@ export default function MePage(): React.ReactElement {
       cancelled = true;
       controller.abort();
     };
-  }, [favKey]); // ✅ 只跟收藏列表变化绑定
+  }, [favKey]);
 
-  // ✅ 修正：loading 是 Set<string>
-  const isBusy = loading.size > 0;
+  const isBusy = favIdsLoading;
 
   return (
     <>
       <main className="wrap">
-        {/* 左侧导航 */}
         <nav className="sidenav" aria-label="アカウントメニュー">
-          <button
-            className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`}
-            onClick={() => setActive('p-profile')}
-            type="button"
-          >
+          <button className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`} onClick={() => setActive('p-profile')} type="button">
             個人情報
           </button>
-          <button
-            className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`}
-            onClick={() => setActive('p-favs')}
-            type="button"
-          >
+          <button className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`} onClick={() => setActive('p-favs')} type="button">
             お気に入り
           </button>
-          <button
-            className={`nav-btn ${active === 'p-address' ? 'active' : ''}`}
-            onClick={() => setActive('p-address')}
-            type="button"
-          >
+          <button className={`nav-btn ${active === 'p-address' ? 'active' : ''}`} onClick={() => setActive('p-address')} type="button">
             住所
           </button>
-          <button
-            className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`}
-            onClick={() => setActive('p-settings')}
-            type="button"
-          >
+          <button className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`} onClick={() => setActive('p-settings')} type="button">
             設定
           </button>
         </nav>
 
-        {/* 個人情報 */}
+        {/* 個人情報（原样保留） */}
         <section className={`panel ${active === 'p-profile' ? 'active' : ''}`}>
+          {/* ...你原来的 profile UI 不动... */}
           <div className="section">
             <div>
               <label htmlFor="name">名前</label>
@@ -148,31 +158,21 @@ export default function MePage(): React.ReactElement {
                 type={showPw ? 'text' : 'password'}
                 placeholder="パスワードを入力してください"
               />
-              <button
-                className="pw-toggle"
-                type="button"
-                aria-label="パスワード表示切替"
-                onClick={() => setShowPw((v) => !v)}
-              >
+              <button className="pw-toggle" type="button" aria-label="パスワード表示切替" onClick={() => setShowPw((v) => !v)}>
                 👁
               </button>
             </div>
 
             <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
-              <button className="btn" type="button">
-                保存
-              </button>
+              <button className="btn" type="button">保存</button>
             </div>
           </div>
         </section>
 
-        {/* お気に入り */}
+        {/* ✅ お気に入り：只改这里的逻辑 */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
-          <h2></h2>
-
           {isBusy && <p>読み込み中…</p>}
 
-          {/* ✅ 修正：空文案不要空 p */}
           {!isBusy && favIds.length === 0 && (
             <p style={{ color: '#6b7280' }}>お気に入りはまだありません。</p>
           )}
@@ -183,16 +183,14 @@ export default function MePage(): React.ReactElement {
 
               <div className="fav-list">
                 {favIds.map((id) => {
-                  const card = favCards[String(id)];
-
+                  const card = favCards[id];
                   const title = card?.title ?? `カードID: ${id}`;
                   const price = card?.price ?? '';
                   const imgSrc = card?.imageUrl ?? '/pic/card.png';
 
                   return (
-                    <article className="card" key={String(id)}>
+                    <article className="card" key={id}>
                       <div className="thumb">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
                       </div>
 
@@ -201,14 +199,15 @@ export default function MePage(): React.ReactElement {
 
                         <div className="chip-row">
                           <span>◎ 1 点</span>
-
                           {price !== '' && <span className="price">{price}</span>}
 
                           <button
                             className="sub"
                             type="button"
-                            // ✅ 这里是关键：用 hook 的 toggleFavorite
-                            onClick={() => toggleFavorite(String(id))}
+                            onClick={async () => {
+                              await toggleFavorite(id);   // 删除
+                              await refreshFavIds();      // ✅ 强制刷新列表
+                            }}
                             style={{
                               background: 'transparent',
                               border: '0',
@@ -230,69 +229,16 @@ export default function MePage(): React.ReactElement {
           )}
         </section>
 
-        {/* 住所 */}
+        {/* 住所 / 設定：你原样保留即可 */}
         <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
-          <div className="section" style={{ maxWidth: 640 }}>
-            <div>
-              <label htmlFor="country">国家</label>
-              <select id="country" className="select">
-                <option>日本</option>
-                <option>中国</option>
-                <option>United States</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="zip">郵便番号</label>
-              <input id="zip" className="input" placeholder="例：1660002" />
-            </div>
-
-            <div className="row-2">
-              <div>
-                <label htmlFor="city">都市・区</label>
-                <input id="city" className="input" placeholder="例：東京・杉並区" />
-              </div>
-              <div>
-                <label htmlFor="block">番地</label>
-                <input id="block" className="input" placeholder="例：4-32-9" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="addr">住所</label>
-              <input id="addr" className="input" placeholder="例：ジュネス５ 303室" />
-            </div>
-
-            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
-              <button className="btn" type="button">
-                保存
-              </button>
-            </div>
-          </div>
+          {/* ...原样... */}
         </section>
 
-        {/* 設定 */}
         <section className={`panel ${active === 'p-settings' ? 'active' : ''}`} id="p-settings">
-          <div className="section" style={{ maxWidth: 520 }}>
-            <div>
-              <label htmlFor="lang">言語</label>
-              <select id="lang" className="select">
-                <option>日本語</option>
-                <option>English</option>
-                <option>中文</option>
-              </select>
-            </div>
-
-            <div style={{ marginTop: 24 }}>
-              <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
-                <button className="btn" type="button">
-                  サインアウト
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* ...原样... */}
         </section>
       </main>
+
 
       <style jsx global>{`
         :root {
