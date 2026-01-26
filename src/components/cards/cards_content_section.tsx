@@ -79,7 +79,7 @@ const CardsContentSection: React.FC<CardsContentSectionProps> = ({
                             </div>
                         )}
                         {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                 <div className="flex">
                                     <div className="flex-shrink-0">
                                         <XCircle className="h-5 w-5 text-red-400" />
@@ -108,7 +108,7 @@ const CardsContentSection: React.FC<CardsContentSectionProps> = ({
                                 ) : (
                                     <div className="text-center py-12">
                                         <div className="max-w-md mx-auto">
-                                            <Box className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                                            <Box className="h-12 w-12 text-gray-400 mx-auto" />
                                             <h3 className="text-lg font-medium text-gray-900 mb-2">カードが見つかりません。</h3>
                                             <p className="text-gray-600">フィルターを調整して、もっと多くの結果を見つけてください。</p>
                                         </div>

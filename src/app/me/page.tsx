@@ -160,7 +160,7 @@ export default function MePage(): React.ReactElement {
 
         {/* お気に入り（✅ 動的） */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
-          <h2>お気に入り</h2>
+          <h2></h2>
 
           {/* 你截图里 loading 是 Set<string>，这里兼容两种 */}
           {((loading instanceof Set && loading.size > 0) || loading === true) && (
@@ -168,7 +168,7 @@ export default function MePage(): React.ReactElement {
           )}
 
           {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
-            <p>お気に入りはありません。</p>
+            <p></p>
           )}
 
           {favIds.length > 0 && (
@@ -236,23 +236,23 @@ export default function MePage(): React.ReactElement {
 
             <div>
               <label htmlFor="zip">郵便番号</label>
-              <input id="zip" className="input" placeholder="1660002" />
+              <input id="zip" className="input" placeholder="例：1660002" />
             </div>
 
             <div className="row-2">
               <div>
                 <label htmlFor="city">都市・区</label>
-                <input id="city" className="input" placeholder="東京・杉並区" />
+                <input id="city" className="input" placeholder="例：東京・杉並区" />
               </div>
               <div>
                 <label htmlFor="block">番地</label>
-                <input id="block" className="input" placeholder="4-32-9" />
+                <input id="block" className="input" placeholder="例：4-32-9" />
               </div>
             </div>
 
             <div>
               <label htmlFor="addr">住所</label>
-              <input id="addr" className="input" placeholder="ジュネス５ 303室" />
+              <input id="addr" className="input" placeholder="例：ジュネス５ 303室" />
             </div>
 
             <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
@@ -411,4 +411,3 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
-

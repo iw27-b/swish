@@ -9,7 +9,7 @@ const BannerSection: React.FC = () => {
     return (
         <ErrorBoundary
             fallback={
-                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-16 mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="bg-gray-100 rounded-lg p-8 text-center">
                         <p className="text-gray-600">バナーカルーセルが利用できません。</p>
                     </div>
@@ -17,11 +17,11 @@ const BannerSection: React.FC = () => {
             }
         >
             <Suspense fallback={
-                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-16 mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <LoadingSkeleton type="banner" />
                 </div>
             }>
-                <div className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-16 mt-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <BannerCarousel height="300px" autoPlay={true} intervalMs={4000} />
                 </div>
             </Suspense>
