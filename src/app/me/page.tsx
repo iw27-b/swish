@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useFavorites } from '@/lib/favorites';
 import { useAuth, authFetch } from '@/lib/client_auth';
+import { useRouter } from 'next/navigation';
 
 type PanelKey = 'p-profile' | 'p-favs' | 'p-address' | 'p-settings';
 
@@ -31,14 +32,17 @@ async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<Card
   // ✅ 兼容常见结构：{data:{...}} / {data:{card:{...}}} / 直接 {...}
   const data = json?.data?.card ?? json?.data ?? json?.card ?? json;
 
-  // ✅ 兼容各种图片字段（你后端到底叫什么，这里尽量都吃）
+  // ✅ 兼容各种图片字段（尽量都吃）
   const imageUrl =
     data?.imageUrl ??
     data?.img ??
     data?.image ??
     data?.thumbnailUrl ??
     data?.frontImageUrl ??
+    data?.frontImage ??
+    data?.front ??
     data?.images?.[0]?.url ??
+    data?.images?.[0] ??
     data?.card?.imageUrl ??
     data?.card?.img ??
     data?.card?.image ??
@@ -49,22 +53,30 @@ async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<Card
     id: String(cardId),
     title: data?.title ?? data?.name ?? data?.cardTitle ?? data?.itemTitle,
     price: data?.price ?? data?.currentPrice ?? data?.amount,
-    imageUrl,
+    imageUrl: typeof imageUrl === 'string' ? imageUrl : undefined,
   };
 }
 
 export default function MePage(): React.ReactElement {
+  const router = useRouter();
+
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  const { user, isAuthenticated } = useAuth();
+  const authAny = useAuth() as any;
+  const { user, isAuthenticated } = authAny as { user?: any; isAuthenticated?: boolean };
+
+  // ✅ 兼容 logout / signOut / signout
+  const doLogout: undefined | (() => Promise<void> | void) =
+    authAny?.logout ?? authAny?.signOut ?? authAny?.signout;
+
   const { toggleFavorite } = useFavorites();
 
   // ✅ me 页面自己维护 favorites id（不依赖 hook 内 state）
   const [favIds, setFavIds] = useState<string[]>([]);
   const [favIdsLoading, setFavIdsLoading] = useState(false);
 
-  // ✅ 关键：把“读不到”的原因显示出来
+  // ✅ 把“读不到”的原因显示出来
   const [favIdsError, setFavIdsError] = useState<string | null>(null);
 
   const cacheRef = useRef<Record<string, CardLite>>({});
@@ -96,13 +108,15 @@ export default function MePage(): React.ReactElement {
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         setFavIds([]);
-        setFavIdsError(`お気に入り取得に失敗しました（${res.status}）${text ? `: ${text}` : ''}`);
+        setFavIdsError(
+          `お気に入り取得に失敗しました（${res.status}）${text ? `: ${text}` : ''}`
+        );
         return;
       }
 
       const data = await res.json();
 
-      // ✅ 兼容多种返回结构（你后端可能返回 fav.cardId 或 fav.card.id）
+      // ✅ 兼容多种返回结构（fav.card.id / fav.cardId / fav.card_id）
       const raw = data?.data?.favorites ?? data?.favorites ?? [];
       const ids = (raw as any[])
         .map((f) => {
@@ -151,7 +165,9 @@ export default function MePage(): React.ReactElement {
 
       setFavCardsLoading(true);
       try {
-        const results = await Promise.all(missing.map((id) => fetchCardById(id, controller.signal)));
+        const results = await Promise.all(
+          missing.map((id) => fetchCardById(id, controller.signal))
+        );
         if (cancelled) return;
 
         const nextCache: Record<string, CardLite> = { ...cacheRef.current };
@@ -188,6 +204,7 @@ export default function MePage(): React.ReactElement {
           >
             個人情報
           </button>
+
           <button
             className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`}
             onClick={() => setActive('p-favs')}
@@ -195,6 +212,7 @@ export default function MePage(): React.ReactElement {
           >
             お気に入り
           </button>
+
           <button
             className={`nav-btn ${active === 'p-address' ? 'active' : ''}`}
             onClick={() => setActive('p-address')}
@@ -202,6 +220,7 @@ export default function MePage(): React.ReactElement {
           >
             住所
           </button>
+
           <button
             className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`}
             onClick={() => setActive('p-settings')}
@@ -290,7 +309,10 @@ export default function MePage(): React.ReactElement {
                             type="button"
                             onClick={async () => {
                               await toggleFavorite(id);
-                              await refreshFavIds(); // ✅ 强制刷新列表
+                              // ✅ 强制刷新列表：以数据库为准
+                              cacheRef.current = {};
+                              setFavCards({});
+                              await refreshFavIds();
                             }}
                             style={{
                               background: 'transparent',
@@ -354,7 +376,7 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* 設定 */}
+        {/* ✅ 設定（加入登出 + 回首页） */}
         <section className={`panel ${active === 'p-settings' ? 'active' : ''}`} id="p-settings">
           <div className="section" style={{ maxWidth: 520 }}>
             <div>
@@ -368,7 +390,26 @@ export default function MePage(): React.ReactElement {
 
             <div style={{ marginTop: 24 }}>
               <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
-                <button className="btn" type="button">
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      if (typeof doLogout === 'function') {
+                        await doLogout();
+                      } else {
+                        // fallback：如果你有 logout API
+                        await authFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+                      }
+                    } finally {
+                      router.push('/');
+                      // 可选：让 header/导航立刻刷新登录态
+                      try {
+                        router.refresh?.();
+                      } catch {}
+                    }
+                  }}
+                >
                   サインアウト
                 </button>
               </div>
@@ -376,6 +417,8 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
       </main>
+
+
 
 
       <style jsx global>{`
