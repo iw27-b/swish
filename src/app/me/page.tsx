@@ -285,11 +285,65 @@ export default function MePage(): React.ReactElement {
 
         {/* 住所 / 設定：你原样保留即可 */}
         <section className={`panel ${active === 'p-address' ? 'active' : ''}`}>
-          {/* ...原样... */}
+          <div className="section" style={{ maxWidth: 640 }}>
+            <div>
+              <label htmlFor="country">国家</label>
+              <select id="country" className="select">
+                <option>日本</option>
+                <option>中国</option>
+                <option>United States</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="zip">郵便番号</label>
+              <input id="zip" className="input" placeholder="例：1660002" />
+            </div>
+
+            <div className="row-2">
+              <div>
+                <label htmlFor="city">都市・区</label>
+                <input id="city" className="input" placeholder="例：東京・杉並区" />
+              </div>
+              <div>
+                <label htmlFor="block">番地</label>
+                <input id="block" className="input" placeholder="例：4-32-9" />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="addr">住所</label>
+              <input id="addr" className="input" placeholder="例：ジュネス５ 303室" />
+            </div>
+
+            <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn" type="button">
+                保存
+              </button>
+            </div>
+          </div>
         </section>
 
+        {/* 設定 */}
         <section className={`panel ${active === 'p-settings' ? 'active' : ''}`} id="p-settings">
-          {/* ...原样... */}
+          <div className="section" style={{ maxWidth: 520 }}>
+            <div>
+              <label htmlFor="lang">言語</label>
+              <select id="lang" className="select">
+                <option>日本語</option>
+                <option>English</option>
+                <option>中文</option>
+              </select>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
+                <button className="btn" type="button">
+                  サインアウト
+                </button>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
 
