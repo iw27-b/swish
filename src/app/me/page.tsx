@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFavorites } from '@/lib/favorites';
-import { toggleFavorite } from '@/lib/card_actions';
 
 type PanelKey = 'p-profile' | 'p-favs' | 'p-address' | 'p-settings';
 
@@ -18,15 +17,13 @@ type CardLite = {
 };
 
 async function fetchCardById(cardId: string): Promise<CardLite> {
-  // ✅ 你如果有真实的 API 路径，把这里改成你的即可
   const res = await fetch(`/api/cards/${cardId}`, { cache: 'no-store' });
   if (!res.ok) return { id: cardId };
 
   const data = await res.json();
 
-  // 尽量把各种可能字段“归一”
   return {
-    id: cardId,
+    id: String(cardId),
     title: data.title ?? data.name ?? data.cardTitle ?? data.itemTitle,
     price: data.price ?? data.currentPrice ?? data.amount,
     imageUrl: data.imageUrl ?? data.img ?? data.image ?? data.thumbnailUrl,
@@ -37,23 +34,29 @@ export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // ✅ 用你现有的 favorites 系统
-  const { favorites, loading } = useFavorites() as {
+  // ✅ 统一：Me 页也只用 useFavorites 里的逻辑（和 Card 页同源）
+  const fav = useFavorites() as unknown as {
     favorites: Set<string>;
-    loading: Set<string> | boolean; // 你截图里 loading 是 Set<string>
+    loading: Set<string> | boolean;
+    toggleFavorite: (cardId: string) => Promise<void> | void;
+    isFavorited: (cardId: string) => boolean;
   };
 
-  const favIds = useMemo(() => Array.from(favorites ?? []), [favorites]);
+  const { favorites, loading, toggleFavorite } = fav;
 
-  // ✅ 缓存卡片详情：避免每次切 tab 都重新请求
+  const favIds = useMemo(() => Array.from(favorites ?? []).map(String), [favorites]);
+
+  // ✅ 缓存卡片详情：避免反复请求
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     let cancelled = false;
 
     async function run() {
-      if (!favIds || favIds.length === 0) {
+      if (!favIds.length) {
+        // favCards 可以保留缓存也可以清空，这里按你原逻辑清空
         setFavCards({});
         return;
       }
@@ -64,12 +67,19 @@ export default function MePage(): React.ReactElement {
 
       setFavCardsLoading(true);
       try {
-        const results = await Promise.all(missing.map((id) => fetchCardById(id)));
-        if (cancelled) return;
+        const results = await Promise.all(
+          missing.map(async (id) => {
+            // 让 abort 生效（fetchCardById 内部没接 signal，这里简单处理：不传也行）
+            if (controller.signal.aborted) return { id };
+            return fetchCardById(id);
+          })
+        );
+
+        if (cancelled || controller.signal.aborted) return;
 
         setFavCards((prev) => {
           const next = { ...prev };
-          for (const card of results) next[card.id] = card;
+          for (const card of results) next[String(card.id)] = card;
           return next;
         });
       } finally {
@@ -78,11 +88,14 @@ export default function MePage(): React.ReactElement {
     }
 
     run();
+
     return () => {
       cancelled = true;
+      controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [favIds.join('|')]);
+  }, [favIds, favCards]);
+
+  const isBusy = (loading instanceof Set && loading.size > 0) || loading === true;
 
   return (
     <>
@@ -162,14 +175,9 @@ export default function MePage(): React.ReactElement {
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2></h2>
 
-          {/* 你截图里 loading 是 Set<string>，这里兼容两种 */}
-          {((loading instanceof Set && loading.size > 0) || loading === true) && (
-            <p>読み込み中…</p>
-          )}
+          {isBusy && <p>読み込み中…</p>}
 
-          {!((loading instanceof Set && loading.size > 0) || loading === true) && favIds.length === 0 && (
-            <p></p>
-          )}
+          {!isBusy && favIds.length === 0 && <p></p>}
 
           {favIds.length > 0 && (
             <>
@@ -186,6 +194,7 @@ export default function MePage(): React.ReactElement {
                   return (
                     <article className="card" key={id}>
                       <div className="thumb">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
                       </div>
 
@@ -200,7 +209,7 @@ export default function MePage(): React.ReactElement {
                           <button
                             className="sub"
                             type="button"
-                            onClick={() => toggleFavorite(id)}
+                            onClick={() => toggleFavorite(String(id))} // ✅ hook 内の toggleFavorite を使う
                             style={{
                               background: 'transparent',
                               border: '0',
@@ -276,7 +285,6 @@ export default function MePage(): React.ReactElement {
             </div>
 
             <div style={{ marginTop: 24 }}>
-          
               <div className="actions" style={{ display: 'flex', justifyContent: 'center' }}>
                 <button className="btn" type="button">
                   サインアウト
