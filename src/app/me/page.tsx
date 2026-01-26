@@ -32,34 +32,35 @@ export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // ✅ 完全匹配你贴的 useFavorites()
-  const { favorites, loading, isAuthenticated, toggleFavorite } = useFavorites();
+  // ✅ 修正：直接用 hook 返回值（不需要 as unknown as）
+  const { favorites, loading, toggleFavorite } = useFavorites();
 
-  // ✅ Set<string> -> string[]，并保持稳定顺序
-  const favIds = useMemo(() => Array.from(favorites).map(String).sort(), [favorites]);
-  const favKey = useMemo(() => favIds.join('|'), [favIds]);
+  // ✅ 统一成 string，防止 number/string 对不上
+  const favIds = useMemo(() => Array.from(favorites).map(String), [favorites]);
 
-  // ✅ 卡片详情缓存：ref 防止 effect 依赖导致循环
+  // ✅ 用 ref 当缓存，避免 useEffect 因为 favCards state 改变而重复触发
   const cacheRef = useRef<Record<string, CardLite>>({});
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
-  // ✅ 当收藏列表变化时，拉取缺失的卡片详情
+  // 用一个稳定 key 作为依赖
+  const favKey = useMemo(() => favIds.slice().sort().join('|'), [favIds]);
+
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
 
     async function run() {
-      // 未登录：你的 hook 会 setFavorites(new Set())，这里顺手清空显示
-      if (!isAuthenticated || favIds.length === 0) {
+      if (favIds.length === 0) {
         cacheRef.current = {};
         setFavCards({});
         return;
       }
 
+      // 只拉取缺失的
       const missing = favIds.filter((id) => !cacheRef.current[id]);
       if (missing.length === 0) {
-        // 仍然同步一次（避免 cache 与 state 不一致）
+        // 仍然同步一次 state（防止从别处更新过 cache）
         setFavCards({ ...cacheRef.current });
         return;
       }
@@ -67,12 +68,12 @@ export default function MePage(): React.ReactElement {
       setFavCardsLoading(true);
       try {
         const results = await Promise.all(
-          missing.map((id) => fetchCardById(id, controller.signal))
+          missing.map((id) => fetchCardById(String(id), controller.signal))
         );
         if (cancelled) return;
 
-        for (const c of results) {
-          cacheRef.current[String(c.id)] = c;
+        for (const card of results) {
+          cacheRef.current[String(card.id)] = card;
         }
         setFavCards({ ...cacheRef.current });
       } finally {
@@ -86,9 +87,10 @@ export default function MePage(): React.ReactElement {
       cancelled = true;
       controller.abort();
     };
-  }, [favKey, isAuthenticated]);
+  }, [favKey]); // ✅ 只跟收藏列表变化绑定
 
-  const isBusy = loading instanceof Set ? loading.size > 0 : Boolean(loading);
+  // ✅ 修正：loading 是 Set<string>
+  const isBusy = loading.size > 0;
 
   return (
     <>
@@ -168,32 +170,27 @@ export default function MePage(): React.ReactElement {
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2></h2>
 
-          {!isAuthenticated && (
-            <p style={{ color: '#6b7280' }}>
-              お気に入りを表示するにはログインが必要です。
-            </p>
+          {isBusy && <p>読み込み中…</p>}
+
+          {/* ✅ 修正：空文案不要空 p */}
+          {!isBusy && favIds.length === 0 && (
+            <p style={{ color: '#6b7280' }}>お気に入りはまだありません。</p>
           )}
 
-          {isAuthenticated && isBusy && <p>読み込み中…</p>}
-
-          {isAuthenticated && !isBusy && favIds.length === 0 && (
-            <p>お気に入りはまだありません。</p>
-          )}
-
-          {isAuthenticated && favIds.length > 0 && (
+          {favIds.length > 0 && (
             <>
               {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
 
               <div className="fav-list">
                 {favIds.map((id) => {
-                  const card = favCards[id];
+                  const card = favCards[String(id)];
 
                   const title = card?.title ?? `カードID: ${id}`;
                   const price = card?.price ?? '';
                   const imgSrc = card?.imageUrl ?? '/pic/card.png';
 
                   return (
-                    <article className="card" key={id}>
+                    <article className="card" key={String(id)}>
                       <div className="thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
@@ -210,6 +207,7 @@ export default function MePage(): React.ReactElement {
                           <button
                             className="sub"
                             type="button"
+                            // ✅ 这里是关键：用 hook 的 toggleFavorite
                             onClick={() => toggleFavorite(String(id))}
                             style={{
                               background: 'transparent',
@@ -296,7 +294,6 @@ export default function MePage(): React.ReactElement {
         </section>
       </main>
 
-      {/* 样式 */}
       <style jsx global>{`
         :root {
           --bg: #ffffff;
@@ -420,5 +417,4 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
-
 
