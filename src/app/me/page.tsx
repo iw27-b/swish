@@ -28,165 +28,38 @@ async function fetchCardById(cardId: string, signal?: AbortSignal): Promise<Card
   };
 }
 
-/**
- * ✅ 不改其他文件的前提下，尽可能把“收藏ID列表”找出来
- * 优先级：
- * 1) useFavorites 暴露的 favorites / favoriteIds / ids
- * 2) localStorage 扫描（找 key 包含 favorite 的，解析出数组/Set）
- * 3) /api/favorites（如果存在）
- */
-function getIdsFromHook(fav: any): string[] | null {
-  const raw = fav?.favorites ?? fav?.favoriteIds ?? fav?.ids;
-  if (!raw) return null;
-
-  if (raw instanceof Set) return Array.from(raw).map(String);
-  if (Array.isArray(raw)) return raw.map(String);
-
-  return null;
-}
-
-function tryParseIds(value: string): string[] | null {
-  // 可能是 JSON 数组：["1","2"]
-  // 可能是 JSON 对象：{"ids":["1","2"]} 或 {"favorites":["1"]}
-  // 可能是逗号字符串："1,2,3"
-  try {
-    const j = JSON.parse(value);
-    if (Array.isArray(j)) return j.map(String);
-    if (j && typeof j === 'object') {
-      const maybeArr = (j.ids ?? j.favorites ?? j.items ?? j.data) as unknown;
-      if (Array.isArray(maybeArr)) return maybeArr.map(String);
-    }
-  } catch {
-    // ignore
-  }
-
-  if (value.includes(',')) {
-    const parts = value.split(',').map((s) => s.trim()).filter(Boolean);
-    if (parts.length) return parts.map(String);
-  }
-
-  return null;
-}
-
-function getIdsFromLocalStorage(): string[] | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const keys = Object.keys(localStorage);
-    // 找所有可能的收藏key（更宽松：包含 fav / favorite / favourites）
-    const cand = keys.filter((k) =>
-      /fav|favorite|favourite/i.test(k)
-    );
-
-    for (const k of cand) {
-      const v = localStorage.getItem(k);
-      if (!v) continue;
-      const ids = tryParseIds(v);
-      if (ids && ids.length) return ids;
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-async function getIdsFromApi(): Promise<string[] | null> {
-  try {
-    const res = await fetch('/api/favorites', { cache: 'no-store' });
-    if (!res.ok) return null;
-    const data = await res.json();
-
-    // 兼容：["1","2"] 或 { ids: [...] } 或 { favorites: [...] }
-    if (Array.isArray(data)) return data.map(String);
-    if (data && typeof data === 'object') {
-      const arr = data.ids ?? data.favorites ?? data.items;
-      if (Array.isArray(arr)) return arr.map(String);
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
 export default function MePage(): React.ReactElement {
   const [active, setActive] = useState<PanelKey>('p-profile');
   const [showPw, setShowPw] = useState(false);
 
-  // ✅ 仍然用你的 favorites 系统（Card页也在用它）
-  const fav = useFavorites() as any;
-  const toggleFavorite: (cardId: string) => Promise<void> | void = fav?.toggleFavorite;
-  const loading = fav?.loading; // 兼容：Set<string> | boolean
-  const isBusy = (loading instanceof Set && loading.size > 0) || loading === true;
+  // ✅ 完全匹配你贴的 useFavorites()
+  const { favorites, loading, isAuthenticated, toggleFavorite } = useFavorites();
 
-  // ✅ Me 页自己维护收藏ID列表（关键）
-  const [favIds, setFavIds] = useState<string[]>([]);
+  // ✅ Set<string> -> string[]，并保持稳定顺序
+  const favIds = useMemo(() => Array.from(favorites).map(String).sort(), [favorites]);
+  const favKey = useMemo(() => favIds.join('|'), [favIds]);
 
-  // ✅ 刷新收藏ID来源（hook -> localStorage -> api）
-  const refreshFavIds = async () => {
-    const fromHook = getIdsFromHook(fav);
-    if (fromHook && fromHook.length) {
-      setFavIds(fromHook);
-      return;
-    }
-
-    const fromLS = getIdsFromLocalStorage();
-    if (fromLS && fromLS.length) {
-      setFavIds(fromLS);
-      return;
-    }
-
-    const fromApi = await getIdsFromApi();
-    if (fromApi && fromApi.length) {
-      setFavIds(fromApi);
-      return;
-    }
-
-    setFavIds([]);
-  };
-
-  // 初次加载 + 切到 fav 面板时刷新一次
-  useEffect(() => {
-    refreshFavIds();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (active === 'p-favs') refreshFavIds();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
-
-  // 跨 tab 同步 / 从别页返回同步
-  useEffect(() => {
-    const onStorage = () => refreshFavIds();
-    const onFocus = () => refreshFavIds();
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', onFocus);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ✅ 卡片详情缓存（避免反复请求）
+  // ✅ 卡片详情缓存：ref 防止 effect 依赖导致循环
   const cacheRef = useRef<Record<string, CardLite>>({});
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
 
-  const favKey = useMemo(() => favIds.slice().sort().join('|'), [favIds]);
-
+  // ✅ 当收藏列表变化时，拉取缺失的卡片详情
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
 
     async function run() {
-      if (favIds.length === 0) {
+      // 未登录：你的 hook 会 setFavorites(new Set())，这里顺手清空显示
+      if (!isAuthenticated || favIds.length === 0) {
         cacheRef.current = {};
         setFavCards({});
         return;
       }
 
-      const missing = favIds.filter((id) => !cacheRef.current[String(id)]);
+      const missing = favIds.filter((id) => !cacheRef.current[id]);
       if (missing.length === 0) {
+        // 仍然同步一次（避免 cache 与 state 不一致）
         setFavCards({ ...cacheRef.current });
         return;
       }
@@ -194,12 +67,12 @@ export default function MePage(): React.ReactElement {
       setFavCardsLoading(true);
       try {
         const results = await Promise.all(
-          missing.map((id) => fetchCardById(String(id), controller.signal))
+          missing.map((id) => fetchCardById(id, controller.signal))
         );
         if (cancelled) return;
 
-        for (const card of results) {
-          cacheRef.current[String(card.id)] = card;
+        for (const c of results) {
+          cacheRef.current[String(c.id)] = c;
         }
         setFavCards({ ...cacheRef.current });
       } finally {
@@ -213,7 +86,9 @@ export default function MePage(): React.ReactElement {
       cancelled = true;
       controller.abort();
     };
-  }, [favKey]);
+  }, [favKey, isAuthenticated]);
+
+  const isBusy = loading instanceof Set ? loading.size > 0 : Boolean(loading);
 
   return (
     <>
@@ -289,27 +164,36 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* お気に入り（✅ 动态） */}
+        {/* お気に入り */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           <h2></h2>
 
-          {isBusy && <p>読み込み中…</p>}
+          {!isAuthenticated && (
+            <p style={{ color: '#6b7280' }}>
+              お気に入りを表示するにはログインが必要です。
+            </p>
+          )}
 
-          {!isBusy && favIds.length === 0 && <p>お気に入りはまだありません。</p>}
+          {isAuthenticated && isBusy && <p>読み込み中…</p>}
 
-          {favIds.length > 0 && (
+          {isAuthenticated && !isBusy && favIds.length === 0 && (
+            <p>お気に入りはまだありません。</p>
+          )}
+
+          {isAuthenticated && favIds.length > 0 && (
             <>
               {favCardsLoading && <p style={{ color: '#6b7280' }}>カード情報を取得中…</p>}
 
               <div className="fav-list">
                 {favIds.map((id) => {
-                  const card = favCards[String(id)];
+                  const card = favCards[id];
+
                   const title = card?.title ?? `カードID: ${id}`;
                   const price = card?.price ?? '';
                   const imgSrc = card?.imageUrl ?? '/pic/card.png';
 
                   return (
-                    <article className="card" key={String(id)}>
+                    <article className="card" key={id}>
                       <div className="thumb">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={imgSrc} alt="カード画像" />
@@ -326,11 +210,7 @@ export default function MePage(): React.ReactElement {
                           <button
                             className="sub"
                             type="button"
-                            onClick={async () => {
-                              // ✅ 删除后也立刻刷新列表
-                              await toggleFavorite?.(String(id));
-                              await refreshFavIds();
-                            }}
+                            onClick={() => toggleFavorite(String(id))}
                             style={{
                               background: 'transparent',
                               border: '0',
@@ -540,4 +420,5 @@ export default function MePage(): React.ReactElement {
     </>
   );
 }
+
 
