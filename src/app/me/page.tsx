@@ -37,6 +37,9 @@ export default function MePage(): React.ReactElement {
   const [favIds, setFavIds] = useState<string[]>([]);
   const [favIdsLoading, setFavIdsLoading] = useState(false);
 
+  // ✅ 关键：把“读不到”的原因显示出来
+  const [favIdsError, setFavIdsError] = useState<string | null>(null);
+
   const cacheRef = useRef<Record<string, CardLite>>({});
   const [favCards, setFavCards] = useState<Record<string, CardLite>>({});
   const [favCardsLoading, setFavCardsLoading] = useState(false);
@@ -44,31 +47,57 @@ export default function MePage(): React.ReactElement {
   const favKey = useMemo(() => favIds.slice().sort().join('|'), [favIds]);
 
   // ✅ 强制刷新收藏 id：进入 fav 面板就拉一次
-  async function refreshFavIds() {
+  const refreshFavIds = async () => {
+    // 每次刷新前先清掉错误
+    setFavIdsError(null);
+
     if (!isAuthenticated || !user) {
       setFavIds([]);
+      setFavIdsError('未ログインのため、お気に入りを表示できません。');
       return;
     }
+
     setFavIdsLoading(true);
     try {
       const res = await authFetch(`/api/users/${user.id}/favorites?pageSize=50`);
+
       if (!res.ok) {
+        const text = await res.text().catch(() => '');
         setFavIds([]);
+        setFavIdsError(`お気に入り取得に失敗しました（${res.status}）${text ? `: ${text}` : ''}`);
         return;
       }
+
       const data = await res.json();
-      const ids = (data?.data?.favorites ?? [])
-        .map((f: any) => String(f?.card?.id))
-        .filter(Boolean);
+
+      // ✅ 兼容多种返回结构（你后端可能返回 fav.cardId 或 fav.card.id）
+      const raw = data?.data?.favorites ?? data?.favorites ?? [];
+      const ids = (raw as any[])
+        .map((f) => {
+          const id =
+            f?.card?.id ??
+            f?.cardId ??
+            f?.card_id ??
+            f?.cardID ??
+            f?.id; // 兜底
+          return id == null ? null : String(id);
+        })
+        .filter(Boolean) as string[];
+
       setFavIds(ids);
+    } catch (e: any) {
+      setFavIds([]);
+      setFavIdsError(`お気に入り取得で例外が発生しました: ${e?.message ?? String(e)}`);
     } finally {
       setFavIdsLoading(false);
     }
-  }
+  };
 
-  // ✅ 切到 “お気に入り” 时刷新
+  // ✅ 切到 “お気に入り” 时刷新：同时清缓存，避免旧缓存挡住新数据
   useEffect(() => {
     if (active === 'p-favs') {
+      cacheRef.current = {};
+      setFavCards({});
       refreshFavIds();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -122,23 +151,38 @@ export default function MePage(): React.ReactElement {
     <>
       <main className="wrap">
         <nav className="sidenav" aria-label="アカウントメニュー">
-          <button className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`} onClick={() => setActive('p-profile')} type="button">
+          <button
+            className={`nav-btn ${active === 'p-profile' ? 'active' : ''}`}
+            onClick={() => setActive('p-profile')}
+            type="button"
+          >
             個人情報
           </button>
-          <button className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`} onClick={() => setActive('p-favs')} type="button">
+          <button
+            className={`nav-btn ${active === 'p-favs' ? 'active' : ''}`}
+            onClick={() => setActive('p-favs')}
+            type="button"
+          >
             お気に入り
           </button>
-          <button className={`nav-btn ${active === 'p-address' ? 'active' : ''}`} onClick={() => setActive('p-address')} type="button">
+          <button
+            className={`nav-btn ${active === 'p-address' ? 'active' : ''}`}
+            onClick={() => setActive('p-address')}
+            type="button"
+          >
             住所
           </button>
-          <button className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`} onClick={() => setActive('p-settings')} type="button">
+          <button
+            className={`nav-btn ${active === 'p-settings' ? 'active' : ''}`}
+            onClick={() => setActive('p-settings')}
+            type="button"
+          >
             設定
           </button>
         </nav>
 
         {/* 個人情報（原样保留） */}
         <section className={`panel ${active === 'p-profile' ? 'active' : ''}`}>
-          {/* ...你原来的 profile UI 不动... */}
           <div className="section">
             <div>
               <label htmlFor="name">名前</label>
@@ -158,7 +202,12 @@ export default function MePage(): React.ReactElement {
                 type={showPw ? 'text' : 'password'}
                 placeholder="パスワードを入力してください"
               />
-              <button className="pw-toggle" type="button" aria-label="パスワード表示切替" onClick={() => setShowPw((v) => !v)}>
+              <button
+                className="pw-toggle"
+                type="button"
+                aria-label="パスワード表示切替"
+                onClick={() => setShowPw((v) => !v)}
+              >
                 👁
               </button>
             </div>
@@ -169,11 +218,16 @@ export default function MePage(): React.ReactElement {
           </div>
         </section>
 
-        {/* ✅ お気に入り：只改这里的逻辑 */}
+        {/* ✅ お気に入り */}
         <section className={`panel ${active === 'p-favs' ? 'active' : ''}`}>
           {isBusy && <p>読み込み中…</p>}
 
-          {!isBusy && favIds.length === 0 && (
+          {/* ✅ 失败原因显示出来（这会直接告诉你为什么“读了但没显示”） */}
+          {!isBusy && favIdsError && (
+            <p style={{ color: '#ef4444' }}>{favIdsError}</p>
+          )}
+
+          {!isBusy && !favIdsError && favIds.length === 0 && (
             <p style={{ color: '#6b7280' }}>お気に入りはまだありません。</p>
           )}
 
@@ -205,8 +259,8 @@ export default function MePage(): React.ReactElement {
                             className="sub"
                             type="button"
                             onClick={async () => {
-                              await toggleFavorite(id);   // 删除
-                              await refreshFavIds();      // ✅ 强制刷新列表
+                              await toggleFavorite(id);   // 删除（如果后端失败，这里也不会真的删）
+                              await refreshFavIds();      // ✅ 无论如何再拉一次，显示数据库真实结果
                             }}
                             style={{
                               background: 'transparent',
