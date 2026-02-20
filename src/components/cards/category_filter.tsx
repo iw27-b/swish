@@ -58,8 +58,8 @@ async function fetchFilterData(): Promise<CategoryFilterData> {
         const filterData: CategoryFilterData = {
             // TODO: Add organizations endpoint or derive from teams
             organizations: [
-                { value: 'NBA', count: 0 },
-                { value: 'FIBA', count: 0 },
+                { value: 'NBA', count: 24 },
+                { value: 'FIBA', count: 2 },
                 { value: 'NCAA', count: 0 },
             ],
             players: data.data?.cardFilters?.players || [],
@@ -130,11 +130,19 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
 
                 // Fetch fresh data
                 const data = await fetchFilterData();
-                setFilterData(data);
+                // setFilterData(data);
+
+                const sortedData = {
+                    ...data,
+                    players: [...data.players].sort((a, b) => 
+                        a.value.localeCompare(b.value, 'ja')
+                    )
+                };
+                setFilterData(sortedData);
 
                 // Update cache
                 setCachedData({
-                    data,
+                    data: sortedData,
                     timestamp: now
                 });
             } catch (err) {
@@ -254,7 +262,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
                         />
                         <span className="ml-3 text-sm text-gray-700">はい</span>
                     </div>
-                    <span className="text-xs text-gray-400 ml-2 flex-shrink-0">(247)</span>
+                    <span className="text-xs text-gray-400 ml-2 flex-shrink-0">(18)</span>
                 </label>
                 <label className="flex items-center justify-between cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
                     <div className="flex items-center">
@@ -266,7 +274,7 @@ const CategoryFilter: React.FC<CategoryFilterProps> = ({
                         />
                         <span className="ml-3 text-sm text-gray-700">いいえ</span>
                     </div>
-                    <span className="text-xs text-gray-400 ml-2 flex-shrink-0">(1,834)</span>
+                    <span className="text-xs text-gray-400 ml-2 flex-shrink-0">(8)</span>
                 </label>
             </div>
         </div>
